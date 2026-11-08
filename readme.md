@@ -26,10 +26,14 @@ The code doesn't set up the interrupts at all right now, so I think that might b
 ## This is just a personal project
 This will likely never help anyone, this is just for fun and learning... Plus it should be able to play DOOM, so why not!
 
-## Updates
+## Update
 I've added some basic (crude?) polling IDE interface code, as well as an MBR parser and some code to probe an EXT2 file system.<br>
 Let's see if I can load a payload myself from an ext2 FS.<br><br>
-Current console output (ignore the PCI bus scan, this is from QEMU not real hardware):
+
+## Update
+Looks like reading from EXT2 is working well, read in a test payload elf from other attempts and it's executing that now... So in theory I should just be able to load a Linux kernel and initrd and it'll "Just work"?
+
+## Current console output (ignore the PCI bus scan, this is from QEMU not real hardware):
 ```FGT-60 early init
 Stage 1: VT8231/UART up, VT8601 + SDRAM init...
 Found 128MB
@@ -54,15 +58,6 @@ Reading MBR...
 MBR signature valid.
 Primary partitions:
   Partition 00000001: type=00000083 start=00000800 sectors=0000f7fe status=00000080
-Reading EXT superblock...
-EXT filesystem detected!
-  Inodes: 00001f00
-  Blocks: 00007bfc
-  Block size: 00000400
-  Blocks/group: 00002000
-  Inodes/group: 000007c0
-  Revision: 00000001
-  Inode size: 00000100
 
 Reading EXT superblock...
 EXT filesystem mounted.
@@ -74,5 +69,18 @@ Root directory entries:
   inode=00000002 type=00000002 name=.
   inode=00000002 type=00000002 name=..
   inode=0000000b type=00000002 name=lost+found
+  inode=00000f81 type=00000002 name=test
+  inode=0000000d type=00000001 name=hello.elf
 Directory listing complete.
-Halted.```
+
+Contents of /test/test.txt:
+Hello from EXT2!
+
+
+
+ELF file /hello.elf loaded, entry point: 00200000
+
+==============================
+ Hello from standalone ELF!
+ Running on the FortiGate 60
+==============================

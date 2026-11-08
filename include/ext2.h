@@ -33,5 +33,6 @@ typedef struct
 
 int ext2_mount(ext2_fs_t *fs, ide_dev_t *dev, uint32_t partitionStart, uint32_t partitionSectors);
 int ext2_list_root(ext2_fs_t *fs);
+int ext2_read_file(ext2_fs_t *fs, const char *path, void *buffer, uint32_t bufferSize, uint32_t *bytesRead);
 
 #endif

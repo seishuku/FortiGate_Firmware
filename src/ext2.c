@@ -385,3 +385,313 @@ int ext2_list_root(ext2_fs_t *fs)
 
 	return 0;
 }
+
+static int ext2_read_inode(ext2_fs_t *fs, uint32_t inodeNumber, uint8_t *inode)
+{
+	uint8_t gd[32];
+
+	uint32_t group;
+	uint32_t index;
+	uint32_t gdtBlock;
+	uint32_t inodeTable;
+	uint64_t offset;
+
+	if(inodeNumber==0||inodeNumber>fs->inodesCount)
+		return -1;
+
+	group=(inodeNumber-1)/fs->inodesPerGroup;
+	index=(inodeNumber-1)%fs->inodesPerGroup;
+
+	gdtBlock=fs->firstDataBlock+1;
+
+	if(ext2_read_bytes(fs, gdtBlock*fs->blockSize+group*32, sizeof(gd), gd)!=0)
+		return -1;
+
+	inodeTable=get_le32(gd+8);
+
+	if(inodeTable==0||inodeTable>=fs->blocksCount)
+		return -1;
+
+	offset=(uint64_t)inodeTable*fs->blockSize+(uint64_t)index*fs->inodeSize;
+
+	if(offset>0xFFFFFFFFull)
+		return -1;
+
+	return ext2_read_bytes(fs, (uint32_t)offset, fs->inodeSize, inode);
+}
+
+static int ext2_get_data_block(ext2_fs_t *fs, const uint8_t *inode, uint32_t logical, uint32_t *physical)
+{
+	uint32_t pointers=fs->blockSize/4;
+
+	/* Direct blocks */
+	if(logical<12)
+	{
+		*physical=get_le32(inode+40+logical*4);
+		return 0;
+	}
+
+	logical-=12;
+
+	/* Single, double and triple indirect blocks */
+	uint32_t depth;
+	for(depth=1;depth<=3;depth++)
+	{
+		uint64_t capacity=1;
+
+		for(uint32_t i=0;i<depth;i++)
+			capacity*=pointers;
+
+		if(logical<capacity)
+			break;
+
+		logical-=(uint32_t)capacity;
+	}
+
+	if(depth>3)
+		return -1;
+
+	uint32_t block=get_le32(inode+40+(11+depth)*4);
+
+	if(block==0)
+	{
+		*physical=0;
+		return 0;
+	}
+
+	while(depth)
+	{
+		uint32_t j;
+
+		uint8_t indirect[EXT2_MAX_BLOCK_SIZE]={ 0 };
+		if(ext2_read_block(fs, block, indirect)!=0)
+			return -1;
+
+		uint32_t divisor=1;
+
+		for(j=1;j<depth;j++)
+			divisor*=pointers;
+
+		uint32_t index=logical/divisor;
+		logical%=divisor;
+
+		if(index>=pointers)
+			return -1;
+
+		block=get_le32(indirect+index*4);
+
+		if(block==0)
+		{
+			*physical=0;
+			return 0;
+		}
+
+		depth--;
+	}
+
+	if(block>=fs->blocksCount)
+		return -1;
+
+	*physical=block;
+
+	return 0;
+}
+
+static int ext2_find_entry(ext2_fs_t *fs, const uint8_t *dirInode, const char *name, uint32_t nameLength, uint32_t *resultInode)
+{
+	uint32_t directorySize=get_le32(dirInode + 4);
+	uint32_t remaining=directorySize;
+	uint32_t logical=0;
+
+	if(get_le32(dirInode+32)&0x00001000)
+		return -1; /* Indexed directories not supported */
+
+	uint8_t blockBuffer[EXT2_MAX_BLOCK_SIZE];
+
+	while(remaining)
+	{
+		uint32_t physical=0;
+		if(ext2_get_data_block(fs, dirInode, logical, &physical)!=0)
+			return -1;
+
+		uint32_t blockLength=remaining;
+
+		if(blockLength>fs->blockSize)
+			blockLength=fs->blockSize;
+
+		if(physical==0)
+		{
+			remaining-=blockLength;
+			logical++;
+			continue;
+		}
+
+		if(ext2_read_block(fs, physical, blockBuffer)!=0)
+			return -1;
+
+		uint32_t offset=0;
+		while(offset<blockLength)
+		{
+			uint8_t *entry=blockBuffer+offset;
+
+			uint32_t entryInode=get_le32(entry);
+			uint16_t recordLength=get_le16(entry+4);
+			uint16_t entryNameLength;
+
+			if(fs->featureIncompat&EXT2_FEATURE_INCOMPAT_FILETYPE)
+				entryNameLength=entry[6];
+			else
+				entryNameLength=get_le16(entry+6);
+
+			if(recordLength<8||(recordLength&3)||recordLength>blockLength-offset||entryNameLength>recordLength-8)
+				return -1;
+
+			if(entryInode!=0&&entryNameLength==nameLength&&entryNameLength!=0&&memcmp(entry+8, name, nameLength)==0)
+			{
+				*resultInode=entryInode;
+				return 0;
+			}
+
+			offset+=recordLength;
+		}
+
+		remaining-=blockLength;
+		logical++;
+	}
+
+	return -1;
+}
+
+static int ext2_resolve_path(ext2_fs_t *fs, const char *path, uint8_t *resultInode)
+{
+	if(!path||!*path)
+		return -1;
+
+	uint8_t currentInode[EXT2_MAX_BLOCK_SIZE]={ 0 };
+	uint8_t nextInode[EXT2_MAX_BLOCK_SIZE]={ 0 };
+	uint32_t inodeNumber=EXT2_ROOT_INODE;
+
+	if(ext2_read_inode(fs, inodeNumber, currentInode) != 0)
+		return -1;
+
+	char component[256]={ 0 };
+
+	while(*path)
+	{
+		while(*path=='/')
+			path++;
+
+		if(!*path)
+			break;
+
+		uint32_t length=0;
+
+		while(path[length]&&path[length]!='/')
+		{
+			if(length>=255)
+				return -1;
+
+			component[length]=path[length];
+			length++;
+		}
+
+		component[length]='\0';
+		path+=length;
+
+		if((get_le16(currentInode)&0xF000)!=EXT2_S_IFDIR)
+			return -1;
+
+		uint32_t nextNumber=0;
+		if(ext2_find_entry(fs, currentInode, component, length, &nextNumber) != 0)
+			return -1;
+
+		if(ext2_read_inode(
+			fs,
+			nextNumber,
+			nextInode
+		) != 0)
+			return -1;
+
+		memcpy(currentInode, nextInode, fs->inodeSize);
+	}
+
+	memcpy(resultInode, currentInode, fs->inodeSize);
+
+	return 0;
+}
+
+int ext2_read_file(ext2_fs_t *fs, const char *path, void *buffer, uint32_t bufferSize, uint32_t *bytesRead)
+{
+	uint8_t *dst=(uint8_t *)buffer;
+
+	if(bytesRead)
+		*bytesRead=0;
+
+	if(!fs||!fs->mounted||!path)
+		return -1;
+
+	uint8_t inode[EXT2_MAX_BLOCK_SIZE];
+	if(ext2_resolve_path(fs, path, inode)!=0)
+	{
+		uart_puts("File not found: ");
+		uart_puts(path);
+		uart_putc('\n');
+		return -1;
+	}
+
+	if((get_le16(inode)&0xF000)!=0x8000)
+	{
+		uart_puts("Not a regular file.\n");
+		return -1;
+	}
+
+	uint32_t fileSize=get_le32(inode+4);
+
+	/* Reject files larger than our current 32-bit size support. */
+	if(fileSize==0xFFFFFFFFu)
+		return -1;
+
+	if(fileSize>bufferSize)
+	{
+		uart_puts("Buffer too small.\n");
+		return -1;
+	}
+
+	if(fileSize&&!buffer)
+		return -1;
+
+	uint32_t remaining=fileSize;
+	uint32_t logical=0;
+
+	while(remaining)
+	{
+		uint32_t physical=0;
+		if(ext2_get_data_block(fs, inode, logical, &physical)!=0)
+			return -1;
+
+		uint32_t amount=remaining;
+
+		if(amount>fs->blockSize)
+			amount=fs->blockSize;
+
+		if(physical==0)
+			memset(dst, 0, amount);
+		else
+		{
+			uint8_t blockBuffer[EXT2_MAX_BLOCK_SIZE]={ 0 };
+			if(ext2_read_block(fs, physical, blockBuffer)!=0)
+				return -1;
+
+			memcpy(dst, blockBuffer, amount);
+		}
+
+		dst+=amount;
+		remaining-=amount;
+		logical++;
+	}
+
+	if(bytesRead)
+		*bytesRead=fileSize;
+
+	return 0;
+}

@@ -14,5 +14,6 @@ typedef struct
 } mbr_partition_t;
 
 int mbr_get_partition(ide_dev_t *dev, uint8_t partitionNumber, mbr_partition_t *partition);
+void mbr_print(ide_dev_t *dev);
 
 #endif
