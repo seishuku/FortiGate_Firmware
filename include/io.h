@@ -101,6 +101,12 @@ static inline uint8_t pci_read8(uint32_t a)
 	return inb(0xcfc+(a&3));
 }
 
+static inline uint16_t pci_read16(uint32_t a)
+{
+	outl(0x80000000|(a&~3), 0xcf8);
+	return inw(0xcfc+(a&3));
+}
+
 static inline uint32_t pci_read32(uint32_t a)
 {
 	outl(0x80000000|(a&~3), 0xcf8);
@@ -108,19 +114,19 @@ static inline uint32_t pci_read32(uint32_t a)
 }
 
 /* UART output functions */
-void uart_putc(uint8_t c)
+static inline void uart_putc(uint8_t c)
 {
 	while(!(inb(0x3fd)&0x20));
 	outb(c, 0x3f8);
 }
 
-void uart_puts(const char *s)
+static inline void uart_puts(const char *s)
 {
 	while(*s)
 		uart_putc(*s++);
 }
 
-void uart_hex32(uint32_t v)
+static inline void uart_hex32(uint32_t v)
 {
 	uint32_t i, n;
 

@@ -9,7 +9,7 @@ LD         ?= ld
 OBJCOPY    ?= objcopy
 
 # normal build files, executed in RAM with stack
-SRCS = src/stage2.c src/elf.c src/lib.c src/cbtable.c
+SRCS = src/stage2.c src/elf.c src/lib.c src/cbtable.c src/ide.c
 
 # objects of normal build objects, plus the ROM resident code (init+stage1) and the ELF payload
 OBJS = $(patsubst src/%.c, build/%.o, $(SRCS)) build/init.o build/filo_elf.o
@@ -45,7 +45,7 @@ monitor: flash
 	cat /dev/ttyUSB0
 
 launch: fgt60.rom
-	qemu-system-i386 -bios $< -m 128M -serial stdio
+	qemu-system-i386 -bios $< -m 128M -serial stdio -hda hd.img
 
 clean:
 	rm -rf build tools/romcc fgt60.rom

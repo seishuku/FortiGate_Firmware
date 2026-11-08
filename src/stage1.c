@@ -23,6 +23,7 @@
 
 #define NB(r)	PCI_DEV(0, 0x00, 0, (r))	/* VT8601 north bridge,		0:0.0	*/
 #define SB0(r)	PCI_DEV(0, 0x11, 0, (r))	/* VT8231 PCI-ISA bridge,	0:17.0	*/
+#define SB1(r)	PCI_DEV(0, 0x11, 1, (r))	/* VT8231 PCI-IDE bridge,	0:17.1	*/
 #define SB4(r)	PCI_DEV(0, 0x11, 4, (r))	/* VT8231 power mgmt,		0:17.4	*/
 
 /* ---- misc ---- */
@@ -87,13 +88,22 @@ static void sb_prologue(void)
 	sio(0xfb, 0x00);
 	sio(0xfc, 0x00);
 
-	pci_write8 (SB0(0x40), pci_read8(SB0(0x40))|0x44); // IO recovery time
-	pci_write8 (SB0(0x42), pci_read8(SB0(0x42))|0xf0); // something award does?
-	pci_write8 (SB0(0x4a), pci_read8(SB0(0x4a))|0x08); // dummy PCI request
-	pci_write8 (SB0(0x4c), (pci_read8(SB0(0x4c))&~0x0f)|0x04); // set default IDE interrupt values
-	pci_write8 (SB0(0x4f), pci_read8(SB0(0x4f))|0x08); // INIT# as CPU reset
+	uint8_t read=pci_read8(SB0(0x6c));
+	pci_write8 (SB0(0x6c), read|0x80); // internal IO decode
+
+	read=pci_read8(SB0(0x40));
+	pci_write8 (SB0(0x40), read|0x44); // IO recovery time
+	read=pci_read8(SB0(0x42));
+	pci_write8 (SB0(0x42), read|0xf0); // something award does?
+	read=pci_read8(SB0(0x4a));
+	pci_write8 (SB0(0x4a), read|0x08); // dummy PCI request
+	read=pci_read8(SB0(0x4c));
+	pci_write8 (SB0(0x4c), (read&~0x0f)|0x04); // set default IDE interrupt values
+	read=pci_read8(SB0(0x4f));
+	pci_write8 (SB0(0x4f), read|0x08); // INIT# as CPU reset
 	pci_write8 (SB0(0x50), 0xf2);
-	pci_write8 (SB0(0x51), pci_read8(SB0(0x51))|0x18);
+	read=pci_read8(SB0(0x51));
+	pci_write8 (SB0(0x51), read|0x18);
 	pci_write32(SB0(0x54), 0xc0a0b000);
 	pci_write32(SB0(0x58), 0x00000003);
 	pci_write32(SB0(0x5c), 0x40f00000);
@@ -101,8 +111,35 @@ static void sb_prologue(void)
 	pci_write32(SB0(0x64), 0x08020000);
 	pci_write32(SB0(0x68), 0x00000001);
 
-//	pci_write32(SB0(0x6c), 0x00000000);
-	pci_write8(SB0(0x6c), pci_read8(SB0(0x6c))|0x80); // internal IO decode
+	// IDE
+	read=pci_read8(SB1(0x40));
+	pci_write8(SB1(0x40), read|0x03);
+	// Enable prefetch buffers
+	read=pci_read8(SB1(0x41));
+	pci_write8(SB1(0x41), read|0xf0);
+	// Lower thresholds (cause award does it)
+	read=pci_read8(SB1(0x43));
+	pci_write8(SB1(0x43), read|0x05);
+	// PIO read prefetch counter (cause award does it)
+	pci_write8(SB1(0x44), 0x18);
+	// Use memory read multiple
+	pci_write8(SB1(0x45), 0x1c);
+	// address decoding.
+	read=pci_read8(SB1(0x09));
+	pci_write8(SB1(0x09), read & ~0x05);   /* both channels compat mode */
+	// standard bios sets master bit.
+	read=pci_read8(SB1(0x04));
+	pci_write8(SB1(0x04), (read|0x07)&~0x80);
+
+	// Use compatability mode - per award bios
+	pci_write8(SB1(0x10), 0x00);
+	pci_write8(SB1(0x14), 0x00);
+	pci_write8(SB1(0x18), 0x00);
+	pci_write8(SB1(0x1c), 0x00);
+
+	// Force interrupts to use compat mode - just like Award bios
+	pci_write8(SB1(0x3d), 0x00);
+	pci_write8(SB1(0x3c), 0xff);
 }
 
 /* ---- VT8601 SDRAM command cycle: Rx6C[2:0] = cmd (other bits preserved) ---- */

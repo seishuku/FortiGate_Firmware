@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "io.h"
+#include "ide.h"
 
 extern char __reserved_lo[];   /* start of the region stage 2 itself uses (bss + stack), from link.ld */
 
@@ -92,6 +93,43 @@ void stage2_main(void)
 
 	pci_scan();
 
+	ide_dev_t ide_dev;
+
+	int result=ide_init(&ide_dev, 0x1F0, 0x3F6, 0);
+
+	if(result==IDE_OK)
+	{
+		uart_puts("IDE device: ");
+		if(ide_dev.present)
+		{
+			uart_puts("present, ");
+			uart_puts(ide_dev.lba48 ? "LBA48" : "LBA28");
+			uart_puts(", ");
+			uart_puts(ide_dev.model);
+			uart_puts(", ");
+			uart_hex32((uint32_t)ide_dev.sectors);
+			uart_puts(" sectors\n");
+		}
+		uart_puts("\n");
+
+		// read out the first sector
+		uint8_t sector[512]={ 0 };
+		ide_read(&ide_dev, 0, 1, sector);
+
+		uart_puts("First sector (512 bytes):\n");
+		for(int i=0;i<512;i++)
+		{
+			if(i%16==0)
+				uart_puts("\n");
+			uart_hex32(sector[i]);
+			uart_putc(' ');
+		}
+		uart_puts("\n");
+	}
+	else
+		uart_puts("IDE init failed or no device found.\n");
+
+#if 0
 	uint32_t entry, detected_ram_size=top*1024*1024;
 
 	void *filo_elf=_binary_filo_elf_start;
@@ -118,6 +156,7 @@ void stage2_main(void)
 	// calling FILO entry point here will crash real hardware,
 	//     it runs in QEMU though despite incorrect hardware emulation.
 	((void (*)(void))entry)();
+#endif
 
 	uart_puts("Halted.\n");
 	for (;;);
