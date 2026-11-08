@@ -1,5 +1,5 @@
-#ifndef IDE_H
-#define IDE_H
+#ifndef _IDE_H_
+#define _IDE_H_
 
 #include <stdint.h>
 
@@ -17,7 +17,7 @@ typedef struct
 	uint8_t drive; /* 0 = master, 1 = slave */
 	uint8_t present;
 	uint8_t lba48;
-	uint8_t last_err; /* error register from last failure */
+	uint8_t lastError; /* error register from last failure */
 	uint64_t sectors;
 	char model[41];
 } ide_dev_t;

@@ -82,7 +82,7 @@ static int wait_drq(ide_dev_t *d)
 
 	if(s&(ST_ERR|ST_DF))
 	{
-		d->last_err=inb(d->io+R_ERR);
+		d->lastError=inb(d->io+R_ERR);
 		return IDE_ERR_DEVICE;
 	}
 
@@ -92,7 +92,7 @@ static int wait_drq(ide_dev_t *d)
 
 		if(s&(ST_ERR|ST_DF))
 		{
-			d->last_err=inb(d->io+R_ERR);
+			d->lastError=inb(d->io+R_ERR);
 			return IDE_ERR_DEVICE;
 		}
 
@@ -193,7 +193,7 @@ int ide_init(ide_dev_t *d, uint16_t io, uint16_t ctrl, int drive)
 	d->drive=drive?1:0;
 	d->present=0;
 	d->lba48=0;
-	d->last_err=0;
+	d->lastError=0;
 	d->sectors=0;
 	d->model[0]='\0';
 
@@ -382,7 +382,7 @@ int ide_write(ide_dev_t *d, uint64_t lba, uint32_t count, const void *buf)
 
 	if(s&(ST_ERR|ST_DF))
 	{
-		d->last_err=inb(d->io+R_ERR);
+		d->lastError=inb(d->io+R_ERR);
 		return IDE_ERR_DEVICE;
 	}
 

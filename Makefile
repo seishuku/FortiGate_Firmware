@@ -9,7 +9,7 @@ LD         ?= ld
 OBJCOPY    ?= objcopy
 
 # normal build files, executed in RAM with stack
-SRCS = src/stage2.c src/elf.c src/lib.c src/cbtable.c src/ide.c
+SRCS = src/stage2.c src/elf.c src/lib.c src/cbtable.c src/ide.c src/mbr.c src/ext2.c
 
 # objects of normal build objects, plus the ROM resident code (init+stage1) and the ELF payload
 OBJS = $(patsubst src/%.c, build/%.o, $(SRCS)) build/init.o build/filo_elf.o

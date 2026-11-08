@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "io.h"
 #include "ide.h"
+#include "mbr.h"
+#include "ext2.h"
 
 extern char __reserved_lo[];   /* start of the region stage 2 itself uses (bss + stack), from link.ld */
 
@@ -69,12 +71,165 @@ void pci_scan(void)
     uart_puts("PCI Scan Complete.\n");
 }
 
+#define MBR_PARTITION_OFFSET 446
+#define MBR_SIGNATURE_OFFSET 510
+
+static uint32_t read_le32(const uint8_t *p)
+{
+	return (uint32_t)p[0]
+		| ((uint32_t)p[1] << 8)
+		| ((uint32_t)p[2] << 16)
+		| ((uint32_t)p[3] << 24);
+}
+
+static uint16_t read_le16(const uint8_t *p)
+{
+	return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+static void mbr_print(ide_dev_t *dev)
+{
+	uint8_t sector[512];
+	int result;
+	int i;
+
+	uart_puts("Reading MBR...\n");
+
+	result = ide_read(dev, 0, 1, sector);
+
+	if(result != IDE_OK)
+	{
+		uart_puts("MBR read failed: ");
+		uart_hex32((uint32_t)result);
+		uart_putc('\n');
+		return;
+	}
+
+	if(sector[510] != 0x55 || sector[511] != 0xAA)
+	{
+		uart_puts("Invalid MBR signature: ");
+		uart_hex32(((uint32_t)sector[510] << 8) | sector[511]);
+		uart_putc('\n');
+		return;
+	}
+
+	uart_puts("MBR signature valid.\n");
+	uart_puts("Primary partitions:\n");
+
+	for(i = 0; i < 4; i++)
+	{
+		const uint8_t *p = &sector[MBR_PARTITION_OFFSET + i * 16];
+
+		uint8_t status = p[0];
+		uint8_t type = p[4];
+		uint32_t start = read_le32(p + 8);
+		uint32_t count = read_le32(p + 12);
+
+		if(type == 0 || count == 0)
+			continue;
+
+		uart_puts("  Partition ");
+		uart_hex32(i + 1);
+
+		uart_puts(": type=");
+		uart_hex32(type);
+
+		uart_puts(" start=");
+		uart_hex32(start);
+
+		uart_puts(" sectors=");
+		uart_hex32(count);
+
+		uart_puts(" status=");
+		uart_hex32(status);
+
+		if((uint64_t)start + count > dev->sectors)
+			uart_puts(" [OUT OF DISK RANGE]");
+
+		uart_putc('\n');
+	}
+}
+
+static void ext2_probe(ide_dev_t *dev, uint32_t partition_start)
+{
+	uint8_t sb[512];
+	uint32_t block_size;
+	uint32_t log_block_size;
+	int result;
+
+	uart_puts("Reading EXT superblock...\n");
+
+	result = ide_read(dev, partition_start + 2, 1, sb);
+
+	if(result != IDE_OK)
+	{
+		uart_puts("Superblock read failed: ");
+		uart_hex32((uint32_t)result);
+		uart_putc('\n');
+		return;
+	}
+
+	if(read_le16(sb + 56) != 0xEF53)
+	{
+		uart_puts("No EXT filesystem magic: ");
+		uart_hex32(read_le16(sb + 56));
+		uart_putc('\n');
+		return;
+	}
+
+	log_block_size = read_le32(sb + 24);
+
+	if(log_block_size > 2)
+	{
+		uart_puts("Unsupported EXT block size exponent: ");
+		uart_hex32(log_block_size);
+		uart_putc('\n');
+		return;
+	}
+
+	block_size = 1024U << log_block_size;
+
+	uart_puts("EXT filesystem detected!\n");
+
+	uart_puts("  Inodes: ");
+	uart_hex32(read_le32(sb + 0));
+	uart_putc('\n');
+
+	uart_puts("  Blocks: ");
+	uart_hex32(read_le32(sb + 4));
+	uart_putc('\n');
+
+	uart_puts("  Block size: ");
+	uart_hex32(block_size);
+	uart_putc('\n');
+
+	uart_puts("  Blocks/group: ");
+	uart_hex32(read_le32(sb + 32));
+	uart_putc('\n');
+
+	uart_puts("  Inodes/group: ");
+	uart_hex32(read_le32(sb + 40));
+	uart_putc('\n');
+
+	uart_puts("  Revision: ");
+	uart_hex32(read_le32(sb + 76));
+	uart_putc('\n');
+
+	uart_puts("  Inode size: ");
+	uart_hex32(read_le16(sb + 88));
+	uart_putc('\n');
+}
+
+static ext2_fs_t rootfs;
+
+#if 0
 extern unsigned char _binary_filo_elf_start[];
 extern unsigned char _binary_filo_elf_end[];
 extern unsigned char _binary_filo_elf_size[];
 
 int elf_load(const void *image, uint32_t image_size, uint32_t ram_size, uint32_t *entry);
 void cbtable_build(uint32_t ram_bytes);
+#endif
 
 void stage2_main(void)
 {
@@ -112,19 +267,21 @@ void stage2_main(void)
 		}
 		uart_puts("\n");
 
-		// read out the first sector
-		uint8_t sector[512]={ 0 };
-		ide_read(&ide_dev, 0, 1, sector);
+		mbr_print(&ide_dev);
+		ext2_probe(&ide_dev, 2048);
 
-		uart_puts("First sector (512 bytes):\n");
-		for(int i=0;i<512;i++)
-		{
-			if(i%16==0)
-				uart_puts("\n");
-			uart_hex32(sector[i]);
-			uart_putc(' ');
-		}
 		uart_puts("\n");
+
+		mbr_partition_t partition;
+
+		if(mbr_get_partition(&ide_dev, 1, &partition) != 0)
+		{
+			uart_puts("Failed to get partition 1 from MBR.\n");
+			return;
+		}
+
+		if(ext2_mount(&rootfs, &ide_dev, partition.startLBA, partition.sectors) == 0)
+			ext2_list_root(&rootfs);
 	}
 	else
 		uart_puts("IDE init failed or no device found.\n");
