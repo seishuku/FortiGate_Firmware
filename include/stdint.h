@@ -67,5 +67,14 @@ typedef unsigned long int  uintmax_t;
 
 #undef __HAVE_LONG_LONG__
 
+#if __WORDSIZE == 64
+# define SIZE_MAX      (18446744073709551615UL)
+#else
+# ifdef __WORDSIZE32_SIZE_ULONG
+#  define SIZE_MAX     (4294967295UL)
+# else
+#  define SIZE_MAX     (4294967295U)
+# endif
+#endif
 
 #endif /* I386_STDINT_H */

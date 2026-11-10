@@ -9,10 +9,10 @@ LD         ?= ld
 OBJCOPY    ?= objcopy
 
 # normal build files, executed in RAM with stack
-SRCS = src/stage2.c src/elf.c src/lib.c src/cbtable.c src/ide.c src/mbr.c src/ext2.c
+SRCS = src/elf.c src/ext2.c src/heap.c src/ide.c src/lib.c src/mbr.c src/stage2.c 
 
-# objects of normal build objects, plus the ROM resident code (init+stage1) and the ELF payload
-OBJS = $(patsubst src/%.c, build/%.o, $(SRCS)) build/init.o build/filo_elf.o
+# objects of normal build objects, plus the ROM resident code (init+stage1)
+OBJS = $(patsubst src/%.c, build/%.o, $(SRCS)) build/init.o
 
 all: fgt60.rom
 
@@ -28,9 +28,6 @@ build/stage1.inc: src/stage1.c $(ROMCC) | build
 
 build/init.o: src/init.S build/stage1.inc
 	$(AS) --32 -I build -o $@ $<
-
-build/filo_elf.o: filo.elf | build
-	$(OBJCOPY) -I binary -O elf32-i386 -B i386 $< $@
 
 build/init.elf: $(OBJS) | build
 	$(LD) -m elf_i386 -z noexecstack -T link.ld -o $@ $^

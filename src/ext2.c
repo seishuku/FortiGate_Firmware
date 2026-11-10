@@ -647,6 +647,14 @@ int ext2_read_file(ext2_fs_t *fs, const char *path, void *buffer, uint32_t buffe
 
 	uint32_t fileSize=get_le32(inode+4);
 
+	if(!buffer)
+	{
+		if(bytesRead)
+			*bytesRead=fileSize;
+
+		return 0;
+	}
+
 	/* Reject files larger than our current 32-bit size support. */
 	if(fileSize==0xFFFFFFFFu)
 		return -1;

@@ -32,6 +32,7 @@
 /* GDT selectors */
 	.equ SEL_CODE32,        0x08
 	.equ SEL_DATA32,        0x10
+	.equ SEL_CODE16,		0x18
 
 /* GDT descriptor access bytes */
 	.equ GDT_ACCESS_CODE,   0x9b            /* present, ring 0, code, readable   */
@@ -101,10 +102,20 @@ gdtr:
 	.long gdt
 
 	.balign 8
+/* Flat 4 GB code segment with 16-bit default operand/address size. */
+.macro GDT_FLAT16_CODE
+    .word 0xffff
+    .word 0x0000
+    .byte 0x00
+    .byte 0x9b        /* Present, ring 0, executable, readable */
+    .byte 0x8f        /* 4K granularity, D=0 (16-bit), limit high=F */
+    .byte 0x00
+.endm
 gdt:
 	.quad 0x0000000000000000                /* 0x00: null */
 	GDT_FLAT_SEGMENT GDT_ACCESS_CODE        /* 0x08: SEL_CODE32 */
 	GDT_FLAT_SEGMENT GDT_ACCESS_DATA        /* 0x10: SEL_DATA32 */
+	GDT_FLAT16_CODE
 gdt_end:
 
 /* ------------------------------------------------------------------------- */

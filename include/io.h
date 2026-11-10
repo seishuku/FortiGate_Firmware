@@ -143,4 +143,36 @@ static inline void uart_hex32(uint32_t v)
 	}
 }
 
+static inline void uart_uint32(uint32_t num)
+{
+    if(num==0)
+	{
+        uart_putc('0');
+        return;
+    }
+
+    uint32_t div=1;
+    while(num/div>=10)
+        div*=10;
+
+    while(div>0)
+	{
+        uart_putc((num/div)+'0');
+        
+        num%=div;
+        div/=10;
+    }
+}
+
+static inline void uart_int32(int32_t num)
+{
+	if(num<0)
+	{
+		uart_putc('-');
+		uart_uint32((uint32_t)-(num+1)+1);
+    }
+	else
+		uart_uint32((uint32_t)num);
+}
+
 #endif
