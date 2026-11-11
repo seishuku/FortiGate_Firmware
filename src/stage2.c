@@ -256,11 +256,10 @@ void stage2_main(void)
 
 	// reserve a chunk of memory to space out the kernel and initrd loads, so they don't get wiped out when the kernel is set up and copied into it's entry location.
 	void *reserved=heap_alloc(16*1024*1024);
+	(void)reserved; // unused
 
 	uint8_t *kernelImage=NULL;
 	uint32_t kernelSize=0;
-	uint8_t *initrdImage=NULL;
-	uint32_t initrdSize=0;
 
 	ide_dev_t ide_dev;
 	int result=ide_init(&ide_dev, 0x1F0, 0x3F6, 0);
@@ -310,28 +309,12 @@ void stage2_main(void)
 			}
 			else
 				uart_puts("Failed to get kernel image size\n");
-
-			// if(ext2_read_file(&rootfs, "/initrd", NULL, 0, &initrdSize)==0)
-			// {
-			// 	initrdImage=heap_alloc(initrdSize);
-
-			// 	if(initrdImage==NULL)
-			// 	{
-			// 		uart_puts("Failed to allocate memory for initrd image.\n");
-			// 		return;
-			// 	}
-
-			// 	if(ext2_read_file(&rootfs, "/initrd", initrdImage, initrdSize, &initrdSize)!=0)
-			// 		uart_puts("Failed to read initrd image\n");
-			// }
-			// else
-			// 	uart_puts("Failed to get initrd image size\n");
 		}
 	}
 	else
 		uart_puts("IDE init failed or no device found.\n");
 
-	uart_int32(boot_linux(kernelImage, kernelSize, "console=ttyS0,115200", totalRAM));
+	uart_int32(boot_linux(kernelImage, kernelSize, "console=ttyS0,115200 root=/dev/hda1 ro rootwait ide=nodma", totalRAM));
 	uart_putc('\n');
 
 	uart_puts("Halted.\n");

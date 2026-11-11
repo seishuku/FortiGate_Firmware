@@ -4,18 +4,20 @@
 #include <stdint.h>
 #include <string.h>
 
-#define EXT2_SUPER_MAGIC 0xEF53
-#define EXT2_SUPER_OFFSET 1024
+#define EXT2_SUPER_MAGIC					0xEF53
+#define EXT2_SUPER_OFFSET					1024
 
-#define EXT2_FEATURE_INCOMPAT_FILETYPE 0x0002
-#define EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER 0x0001
-#define EXT2_FEATURE_RO_COMPAT_LARGE_FILE 0x0002
+#define EXT2_FEATURE_INCOMPAT_FILETYPE		0x0002
+#define EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER	0x0001
+#define EXT2_FEATURE_RO_COMPAT_LARGE_FILE	0x0002
 
-#define EXT2_S_IFDIR 0x4000
-#define EXT2_ROOT_INODE 2
+#define EXT3_FEATURE_INCOMPAT_RECOVER		0x0004
 
-#define EXT2_NDIR_BLOCKS 12
-#define EXT2_MAX_BLOCK_SIZE 4096
+#define EXT2_S_IFDIR						0x4000
+#define EXT2_ROOT_INODE						2
+
+#define EXT2_NDIR_BLOCKS					12
+#define EXT2_MAX_BLOCK_SIZE					4096
 
 static uint16_t get_le16(const uint8_t *p)
 {
@@ -171,14 +173,19 @@ int ext2_mount(ext2_fs_t *fs, ide_dev_t *dev, uint32_t partitionStart, uint32_t 
 	 */
 	uint32_t incompatSupported=EXT2_FEATURE_INCOMPAT_FILETYPE;
 
-	if(fs->featureIncompat&~incompatSupported)
+	if(fs->featureIncompat&~incompatSupported&~EXT3_FEATURE_INCOMPAT_RECOVER)
 	{
 		uart_puts("Unsupported EXT incompat features: ");
 		uart_hex32(fs->featureIncompat);
 		uart_putc('\n');
 		return -1;
 	}
-
+ 
+	if(fs->featureIncompat&EXT3_FEATURE_INCOMPAT_RECOVER)
+    {
+        uart_puts("WARNING: EXT3 journal recovery required.\n");
+        uart_puts("Mounted filesystem may be inconsistent.\n");
+    }
 	/*
 	 * These read-only-compatible features are safe for our
 	 * initial read-only implementation.
@@ -602,14 +609,10 @@ static int ext2_resolve_path(ext2_fs_t *fs, const char *path, uint8_t *resultIno
 			return -1;
 
 		uint32_t nextNumber=0;
-		if(ext2_find_entry(fs, currentInode, component, length, &nextNumber) != 0)
+		if(ext2_find_entry(fs, currentInode, component, length, &nextNumber)!=0)
 			return -1;
 
-		if(ext2_read_inode(
-			fs,
-			nextNumber,
-			nextInode
-		) != 0)
+		if(ext2_read_inode(fs, nextNumber, nextInode)!=0)
 			return -1;
 
 		memcpy(currentInode, nextInode, fs->inodeSize);

@@ -55,18 +55,25 @@ static void mem_write32(uint32_t a, uint32_t v)
 
 static void uart_init(void)
 {
-    __builtin_outb(0x83, 0x3fb);                      /* DLAB on */
-	__builtin_outb(0x01, 0x3f8);                      /* divisor low */
-    __builtin_outb(0x00, 0x3f9);                      /* divisor high */
-    __builtin_outb(0x03, 0x3fb);                      /* 8N1, DLAB off */
-    __builtin_outb(0x03, 0x3fc);                      /* DTR|RTS */
-    __builtin_outb(0x00, 0x3f9);                      /* IER off */
-    __builtin_outb(0x01, 0x3fa);                      /* FIFO on */
-    __builtin_outb(0x07, 0x3fa);                      /* FIFO on + clear */
+    /* Disable UART interrupts while firmware uses polling. */
+    __builtin_outb(0x00, 0x3f9);
+
+    /* Set divisor = 1 (115200 baud with 1.8432 MHz clock). */
+    __builtin_outb(0x80, 0x3fb);  /* DLAB = 1 */
+    __builtin_outb(0x01, 0x3f8);  /* Divisor low */
+    __builtin_outb(0x00, 0x3f9);  /* Divisor high */
+
+    /* 8 data bits, no parity, 1 stop bit; DLAB = 0. */
+    __builtin_outb(0x03, 0x3fb);
+
+    /* DTR and RTS asserted. */
+    __builtin_outb(0x03, 0x3fc);
+
+    /* Enable FIFO and clear both FIFOs. */
+    __builtin_outb(0x07, 0x3fa);
 }
 
-/* ---- south bridge (0:17.0) + its integrated Super-I/O config @0x3F0/0x3F1 ---- */
-static void sio(uint8_t idx, uint8_t val)
+static void sio_write(uint8_t idx, uint8_t val)
 {
 	__builtin_outb(idx, 0x3f0);
 	__builtin_outb(val, 0x3f1);
@@ -75,35 +82,31 @@ static void sio(uint8_t idx, uint8_t val)
 static void sb_prologue(void)
 {
 	pci_write8(SB0(0x43), 0xe0);
-
 	pci_write8(SB0(0x50), 0xf6);
 
-	sio(0xf2, 0x04);
-	sio(0xf3, 0x00);
-	sio(0xf4, 0xfe);
-	sio(0xf6, 0xde);
-	sio(0xf7, 0x00);
-    sio(0xf2, 0x04);
-	sio(0xfa, 0x00);
-	sio(0xfb, 0x00);
-	sio(0xfc, 0x00);
+	/* Enable COM1, disable parallel port, leave FDC disabled. */
+	sio_write(0xf2, 0x07);
+	sio_write(0xf3, 0x00);
+	sio_write(0xf4, 0xfe);
 
-	uint8_t read=pci_read8(SB0(0x6c));
-	pci_write8 (SB0(0x6c), read|0x80); // internal IO decode
+	pci_write8(SB0(0x50), 0xf2);
 
-	read=pci_read8(SB0(0x40));
-	pci_write8 (SB0(0x40), read|0x44); // IO recovery time
-	read=pci_read8(SB0(0x42));
-	pci_write8 (SB0(0x42), read|0xf0); // something award does?
-	read=pci_read8(SB0(0x4a));
-	pci_write8 (SB0(0x4a), read|0x08); // dummy PCI request
-	read=pci_read8(SB0(0x4c));
-	pci_write8 (SB0(0x4c), (read&~0x0f)|0x04); // set default IDE interrupt values
-	read=pci_read8(SB0(0x4f));
-	pci_write8 (SB0(0x4f), read|0x08); // INIT# as CPU reset
-	pci_write8 (SB0(0x50), 0xf2);
-	read=pci_read8(SB0(0x51));
-	pci_write8 (SB0(0x51), read|0x18);
+    uint8_t r;
+
+	// COM1 / Serial Port A IRQ routing.
+    pci_write8(SB0(0x46), (pci_read8(SB0(0x46))&0xf0)|0x04);
+
+	// Enable ISA IRQ assertion through SERIRQ.
+    pci_write8(SB0(0x52), (pci_read8(SB0(0x52))&~0x04)|0x08);
+
+	pci_write8 (SB0(0x6c), pci_read8(SB0(0x6c))|0x80); // internal IO decode
+
+	pci_write8 (SB0(0x40), pci_read8(SB0(0x40))|0x44); // IO recovery time
+	pci_write8 (SB0(0x42), pci_read8(SB0(0x42))|0xf0); // something award does?
+	pci_write8 (SB0(0x4a), pci_read8(SB0(0x4a))|0x08); // dummy PCI request
+	pci_write8 (SB0(0x4c), (pci_read8(SB0(0x4c))&~0x0f)|0x04); // set default IDE interrupt values
+	pci_write8 (SB0(0x4f), pci_read8(SB0(0x4f))|0x08); // INIT# as CPU reset
+	pci_write8 (SB0(0x51), pci_read8(SB0(0x51))|0x18);
 	pci_write32(SB0(0x54), 0xc0a0b000);
 	pci_write32(SB0(0x58), 0x00000003);
 	pci_write32(SB0(0x5c), 0x40f00000);
@@ -112,24 +115,19 @@ static void sb_prologue(void)
 	pci_write32(SB0(0x68), 0x00000001);
 
 	// IDE
-	read=pci_read8(SB1(0x40));
-	pci_write8(SB1(0x40), read|0x03);
+	pci_write8(SB1(0x40), pci_read8(SB1(0x40))|0x03);
 	// Enable prefetch buffers
-	read=pci_read8(SB1(0x41));
-	pci_write8(SB1(0x41), read|0xf0);
+	pci_write8(SB1(0x41), pci_read8(SB1(0x41))|0xf0);
 	// Lower thresholds (cause award does it)
-	read=pci_read8(SB1(0x43));
-	pci_write8(SB1(0x43), read|0x05);
+	pci_write8(SB1(0x43), pci_read8(SB1(0x43))|0x05);
 	// PIO read prefetch counter (cause award does it)
 	pci_write8(SB1(0x44), 0x18);
 	// Use memory read multiple
 	pci_write8(SB1(0x45), 0x1c);
 	// address decoding.
-	read=pci_read8(SB1(0x09));
-	pci_write8(SB1(0x09), read & ~0x05);   /* both channels compat mode */
+	pci_write8(SB1(0x09), pci_read8(SB1(0x09))&~0x05);   /* both channels compat mode */
 	// standard bios sets master bit.
-	read=pci_read8(SB1(0x04));
-	pci_write8(SB1(0x04), (read|0x07)&~0x80);
+	pci_write8(SB1(0x04), (pci_read8(SB1(0x04))|0x07)&~0x80);
 
 	// Use compatability mode - per award bios
 	pci_write8(SB1(0x10), 0x00);
@@ -242,17 +240,6 @@ static void nb_init(void)
 	pci_write8(NB(0x5a), 0x08);
 	delay500();
 
-	mem_write32(0x06000000, 0xff0055aa);    /* probe for row 1 at 96 MB */
-
-	if(mem_read32(0x06000000)!=0xff0055aa)
-	{
-        pci_write8(NB(0x5b), 0x08);       /* only 64 MB fitted */
-		uart_puts("Found 64MB\n");
-	}
-	else
-		uart_puts("Found 128MB\n");
-
-	delay500();
 	pci_write8(NB(0x6a), 0x86);           /* refresh on */
 
 	pci_write8(SB4(0xd2), 0x00);          /* SMBus host off */
@@ -294,6 +281,51 @@ static void wbinvd(void)
 	asm volatile ("wbinvd");
 }
 
+uint32_t test_ram(void)
+{
+    uint32_t count, val;
+    volatile uint32_t *p;
+
+    /* Start probing right from 0 MB */
+    count=0;
+    
+    while(count<1024)
+	{
+        p=(volatile uint32_t *)(count<<20);
+        
+        /* Save original content */
+        val=*p;
+        
+        /* Test Pattern 1 */
+        *p=0x55aa55aa;
+        if(*p!=0x55aa55aa)
+		{
+            *p=val;
+            break;
+        }
+        
+        /* Test Pattern 2 */
+        *p=0xaa55aa55;
+        if(*p!=0xaa55aa55)
+		{
+            *p=val;
+            break;
+        }
+        
+        /* Restore memory and move to next MB */
+        *p=val;
+        count++;
+
+		uart_putc('.');
+    }
+    
+	uart_puts("\nCounted RAM: ");
+	uart_uint32(count);
+	uart_puts("MB\n");
+
+    return count;
+}
+
 static void early_cache_init(void)
 {
 	/* Caches are still off (CD|NW set in entry32).  Disable the MTRRs while reprogramming them. */
@@ -315,15 +347,8 @@ static void early_cache_init(void)
 	for(i=MSR_MTRR_PHYS_BASE0;i<MSR_MTRR_PHYS_BASE0+2*MTRR_VAR_PAIRS;i++)
 		write_msr(i, 0, 0);
 
-	/* Total RAM in MB = northbridge Rx5B * 8. */
-	uint32_t ram_mb=pci_read8(NB(0x5b))<<3;
-	if(ram_mb==0)
-	{
-		uart_puts("No RAM reported by northbridge - halting\n");
-
-		for (;;)
-			__builtin_hlt();
-	}
+	/* Test RAM to get working count */
+	uint32_t ram_mb=test_ram();
 
 	/* MTRR0 covers [0, RAM) as write-back.  Assumes a power-of-two RAM size, as before. */
 	write_msr(MSR_MTRR_PHYS_BASE0, MTRR_TYPE_WB, 0);
