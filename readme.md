@@ -60,6 +60,13 @@ Got 3 of the 4 ethernet controllers working, the south bridge integrated, first 
 I can't figure out what's going on with the third RHINE chip though, I've literally tried every IRQ including the ones that you obviously shouldn't use and nothing.<br>
 I guess I'll put that off to the side for now and move on to the next task.
 
+## Update (11/14/2026)
+Got the remaining ethernet controller working (ethernet 2/DMZ port).<br>
+Turns out the original ROM was doing a generic IRQ setup, probably just enough to get the OS image loaded from the CF card and booted.<br>
+It would seem that the OS image must have additional setup stage code that does more hardware configuration, because I've enabled the previously disable PCI IRQ B line and routed eth2 to IRQ 9 and now it works.</br>
+I'm now currently working on seeing if I can get the VGA output working, the header on the board is silkscreened VGAB1... Which is a <i>bit</i> ambiguous, but it has enough pins to be a VGA output and the northbridge on this is AGP with a Trident Blade3D core... So I'm going to explore it.<br>
+I will be a bit sad if it isn't a VGA output though. I do have an alternate way of running DOOM if it comes down to it though. :)
+
 ## Current console output (this is from real hardware):
 ```FGT-60 early init
 Stage 1: VT8231/UART up, VT8601 + SDRAM init...

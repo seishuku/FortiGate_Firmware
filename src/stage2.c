@@ -268,8 +268,7 @@ void stage2_main(void)
 	// 3x RHINE-III IRQs
 	pci_assign_irq(0x00, 0x0e, 0x00, 12); // eth0 (WAN2)
 	pci_assign_irq(0x00, 0x0f, 0x00, 10); // eth1 (WAN1)
-	// Can't find a working good IRQ for this:
-	//pci_assign_irq(0x00, 0x10, 0x00, 0); // eth2 (DMZ)
+	pci_assign_irq(0x00, 0x10, 0x00, 9); // eth2 (DMZ)
 
 	uint32_t totalRAM=pci_read8(PCI_DEV(0, 0, 0, 0x5b))<<3;                /* NB Rx5B = end of last DRAM row, 8 MB units -> MB */
 	uart_puts("Total RAM: ");

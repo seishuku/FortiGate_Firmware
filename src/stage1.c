@@ -105,18 +105,19 @@ static void sb_prologue(void)
 
 	pci_write8 (SB0(0x40), pci_read8(SB0(0x40))|0x44); // IO recovery time
 	pci_write8 (SB0(0x42), pci_read8(SB0(0x42))|0xf0); // something award does?
+	pci_write8 (SB0(0x47), pci_read8(SB0(0x47))|0x20); // enable legacy PIC ports
 	pci_write8 (SB0(0x4a), pci_read8(SB0(0x4a))|0x08); // dummy PCI request
 	pci_write8 (SB0(0x4c), (pci_read8(SB0(0x4c))&~0x0f)|0x04); // set default IDE interrupt values
 	pci_write8 (SB0(0x4f), pci_read8(SB0(0x4f))|0x08); // INIT# as CPU reset
 	pci_write8 (SB0(0x51), pci_read8(SB0(0x51))|0x18);
-	pci_write32(SB0(0x54), 0xc0a0b000);
+	pci_write32(SB0(0x54), 0xc0a9b000); // PCI IRQ level select and PCI IRQ[a,b,c,d] routing
 	pci_write32(SB0(0x58), 0x00000003);
 	pci_write32(SB0(0x5c), 0x40f00000);
 	pci_write32(SB0(0x60), 0x00000000);
 	pci_write32(SB0(0x64), 0x08020000);
 	pci_write32(SB0(0x68), 0x00000001);
 
-	// IDE
+	// IDE enable
 	pci_write8(SB1(0x40), pci_read8(SB1(0x40))|0x03);
 	// Enable prefetch buffers
 	pci_write8(SB1(0x41), pci_read8(SB1(0x41))|0xf0);
