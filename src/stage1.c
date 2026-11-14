@@ -91,7 +91,9 @@ static void sb_prologue(void)
 
 	pci_write8(SB0(0x50), 0xf2);
 
-    uint8_t r;
+	// USB (this device only has 2 ports on one controller)
+	pci_write8(SB0(0x50), pci_read8(SB0(0x50))&~(0x10));
+	// pci_write8(SB0(0x50), pci_read8(SB0(0x50))&~(0x20));
 
 	// COM1 / Serial Port A IRQ routing.
     pci_write8(SB0(0x46), (pci_read8(SB0(0x46))&0xf0)|0x04);

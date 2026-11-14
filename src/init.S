@@ -152,7 +152,7 @@ stage1:
 /* Flat segments are loaded, caches are on, RAM works.  Copy stage 2 into    */
 /* place, set up a stack and .bss, then enter C.  Memory map is in link.ld.  */
 /* ------------------------------------------------------------------------- */
-	.section .rom.text, "ax"                /* stage1.inc may leave us in another section; tail must follow it directly */
+	.section .rom.text, "ax"
 	.extern stage2_main
 stage2_entry:
 	cli

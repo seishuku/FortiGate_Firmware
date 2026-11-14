@@ -8,10 +8,8 @@
 #include "lib.h"
 #include "mbr.h"
 
-extern char __reserved_lo[];   /* start of the region stage 2 itself uses (bss + stack), from link.ld */
-
-static volatile uint32_t bss_probe;                    /* must read 0: stage2_entry cleared .bss */
-static volatile uint32_t data_probe=0x600dc0de;      /* must be intact: .data came through the ROM->RAM shadow copy */
+static volatile uint32_t bss_probe;					// must read 0: stage2_entry cleared .bss
+static volatile uint32_t data_probe=0x600dc0de;		// must be intact: .data came through the ROM->RAM shadow copy
 
 static ext2_fs_t rootfs;
 
@@ -226,6 +224,31 @@ int boot_linux(void *kernel_image_start, size_t total_image_size, const char *cm
 	__builtin_unreachable();
 }
 
+void pci_assign_irq(uint8_t bus, uint8_t dev, uint8_t func, const uint8_t irq)
+{
+	uart_puts("Assigning IRQ ");
+	uart_uint32(irq);
+	uart_puts(" to ");
+	uart_uint32(bus);
+	uart_putc(':');
+	uart_uint32(dev);
+	uart_putc('.');
+	uart_uint32(func);
+	uart_putc('\n');
+
+	// Set device's IRQ assignment
+	pci_write8(PCI_DEV(bus, dev, func, 0x3c), irq);
+
+	// Change to level triggered in PIC.
+	uint16_t int_bits=inb(0x4d0)|(((uint16_t)inb(0x4d1))<<8);
+
+	int_bits|=(1<<irq);
+
+	// Write new values
+	outb((uint8_t)(int_bits&0xff), 0x4d0);
+	outb((uint8_t)(int_bits>>8), 0x4d1);
+}
+
 void stage2_main(void)
 {
 	uart_puts("\nStage 2:\n");
@@ -236,7 +259,19 @@ void stage2_main(void)
 	uart_puts(data_probe==0x600dc0de ? "intact" : "BAD");
 	uart_puts(", stack ok\n");
 
-	uint32_t totalRAM=pci_read8(NB(0x5b))<<3;                /* NB Rx5B = end of last DRAM row, 8 MB units -> MB */
+	// Southbridge USB IRQ
+	pci_assign_irq(0x00, 0x11, 0x02, 10);
+
+	// Southbridge ethernet IRQ
+	pci_assign_irq(0x00, 0x12, 0x00, 11); // eth3 (connected to 4 port hub)
+
+	// 3x RHINE-III IRQs
+	pci_assign_irq(0x00, 0x0e, 0x00, 12); // eth0 (WAN2)
+	pci_assign_irq(0x00, 0x0f, 0x00, 10); // eth1 (WAN1)
+	// Can't find a working good IRQ for this:
+	//pci_assign_irq(0x00, 0x10, 0x00, 0); // eth2 (DMZ)
+
+	uint32_t totalRAM=pci_read8(PCI_DEV(0, 0, 0, 0x5b))<<3;                /* NB Rx5B = end of last DRAM row, 8 MB units -> MB */
 	uart_puts("Total RAM: ");
 	uart_hex32(totalRAM);
 	uart_puts(" MB (from as reported by northbridge)\n");
@@ -289,13 +324,21 @@ void stage2_main(void)
 			return;
 		}
 
-		if(ext2_mount(&rootfs, &ide_dev, partition.startLBA, partition.sectors)==0)
-			ext2_list_root(&rootfs);
+		if(ext2_mount(&rootfs, &ide_dev, partition.startLBA, partition.sectors)!=0)
+			uart_puts("ext2 mount failed.\n");
 
 		if(rootfs.mounted)
 		{
-			if(ext2_read_file(&rootfs, "/vmlinuz", NULL, 0, &kernelSize)==0)
+			const char kernelName[]="/vmlinuz";
+
+			if(ext2_read_file(&rootfs, kernelName, NULL, 0, &kernelSize)==0)
 			{
+				uart_puts("Found kernel: ");
+				uart_puts(kernelName);
+				uart_puts(" (");
+				uart_uint32(kernelSize/1024);
+				uart_puts("KB)\n");
+
 				kernelImage=heap_alloc(kernelSize);
 
 				if(kernelImage==NULL)
@@ -304,7 +347,7 @@ void stage2_main(void)
 					return;
 				}
 
-				if(ext2_read_file(&rootfs, "/vmlinuz", kernelImage, kernelSize, &kernelSize)!=0)
+				if(ext2_read_file(&rootfs, kernelName, kernelImage, kernelSize, &kernelSize)!=0)
 					uart_puts("Failed to read kernel image\n");
 			}
 			else
@@ -314,6 +357,7 @@ void stage2_main(void)
 	else
 		uart_puts("IDE init failed or no device found.\n");
 
+	uart_puts("Booting...\n");
 	uart_int32(boot_linux(kernelImage, kernelSize, "console=ttyS0,115200 root=/dev/hda1 ro rootwait ide=nodma", totalRAM));
 	uart_putc('\n');
 

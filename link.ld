@@ -50,9 +50,6 @@ __shadow_lma   = 0xFFFF0000;
 __shadow_size  = 0x00010000;
 __shadow_delta = __shadow_lma - __shadow_vma;
 
-__linux_sysseg_start = 0x00010000;
-__linux_sysseg_end   = 0x00012000;
-
 /*
  * Stage 2 executes from low RAM.
  *

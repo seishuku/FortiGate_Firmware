@@ -54,6 +54,12 @@ There is still more work to be done with the firmware however, the interrupts ne
 USB is something I want to get working as well.<br>
 Probably should set up the RTC as well, correct times/dates are nice to have for a working system.
 
+## Update (11/13/2026)
+Got USB working, that was pretty simple, just enable the device in the south bridge and assign an IRQ.<br>
+Got 3 of the 4 ethernet controllers working, the south bridge integrated, first and second VIA RHINE chips.<br>
+I can't figure out what's going on with the third RHINE chip though, I've literally tried every IRQ including the ones that you obviously shouldn't use and nothing.<br>
+I guess I'll put that off to the side for now and move on to the next task.
+
 ## Current console output (this is from real hardware):
 ```FGT-60 early init
 Stage 1: VT8231/UART up, VT8601 + SDRAM init...
@@ -62,8 +68,12 @@ Counted RAM: 128MB
 
 Stage 2:
 C runtime: .bss zeroed, .data intact, stack ok
+Assigning IRQ 10 to 0:17.2
+Assigning IRQ 11 to 0:18.0
+Assigning IRQ 12 to 0:14.0
+Assigning IRQ 10 to 0:15.0
+Assigning IRQ 12 to 0:16.0
 Total RAM: 00000080 MB (from as reported by northbridge)
-
 Heap initialized successfully.
 Heap available: 07effff0 bytes, largest free block: 07effff0 bytes
 IDE device: present, LBA28, CactusFlashCard, 001f3920 sectors
@@ -76,31 +86,8 @@ Primary partitions:
 
 Reading EXT superblock...
 EXT filesystem mounted.
-
-Reading root inode...
-Root directory size: 00001000
-
-Root directory entries:
-  inode=00000002 type=00000002 name=.
-  inode=00000002 type=00000002 name=..
-  inode=0000000b type=00000002 name=lost+found
-  inode=0000e6c1 type=00000002 name=var
-  inode=0001cd82 type=00000002 name=dev
-  inode=0002b444 type=00000002 name=bin
-  inode=00015a23 type=00000002 name=etc
-  inode=000240e3 type=00000002 name=lib
-  inode=0002b445 type=00000002 name=mnt
-  inode=00007366 type=00000002 name=tmp
-  inode=00015a26 type=00000002 name=sys
-  inode=0002b44b type=00000002 name=usr
-  inode=00007375 type=00000002 name=boot
-  inode=00015a35 type=00000002 name=home
-  inode=000240f5 type=00000002 name=proc
-  inode=000327aa type=00000002 name=sbin
-  inode=000327ab type=00000002 name=root
-  inode=00000016 type=00000002 name=media
-  inode=00000b92 type=00000001 name=vmlinuz
-Directory listing complete.
+Found kernel: /vmlinuz (1282KB)
+Booting vmlinuz...
 Linux version 2.4.33.3 (root@tree) (gcc version 3.4.6) #1 Fri Sep 1 01:48:52 CDT 2006
 BIOS-provided physical RAM map:
  BIOS-e820: 0000000000000000 - 0000000000100000 (reserved)
@@ -149,7 +136,7 @@ keyboard: Timeout - AT keyboard not present?(ed)
 keyboard: Timeout - AT keyboard not present?(f4)
 ttyS00 at 0x03f8 (irq = 4) is a 16550A
 Real Time Clock Driver v1.10f
-Floppy drive(s): fd0 is unknown type 15 (usb?), fd1 is unknown type 15 (usb?)
+Floppy drive(s): fd0 is unknown type 14 (usb?), fd1 is unknown type 15 (usb?)
 floppy0: no floppy controllers found
 RAMDISK driver initialized: 16 RAM disks of 7777K size 1024 blocksize
 loop: loaded (max 8 devices)
@@ -203,8 +190,7 @@ Adding Swap: 77132k swap-space (priority -1)
 Testing root filesystem status:  read-only filesystem
 Checking root filesystem:
 fsck 1.38 (30-Jun-2005)
-/dev/hda1 has gone 44358 days without being checked, check forced.
-/dev/hda1: 25931/236288 files (0.4% non-contiguous), 64095/236068 blocks       
+/dev/hda1: clean, 25934/236288 files, 64217/236068 blocks
 Remounting root device with read-write enabled.
 /dev/hda1 on / type ext2 (rw)
 Setting system time from the hardware clock (localtime).
@@ -222,162 +208,9 @@ Going multiuser...
 cannot (un)set powersave mode
 /etc/rc.d/rc.inet1:  /sbin/ifconfig lo 127.0.0.1
 /etc/rc.d/rc.inet1:  /sbin/route add -net 127.0.0.0 netmask 255.0.0.0 lo
-via-rhine.c:v1.10-LK1.1.19  July-12-2003  Written by Donald Becker
-  http://www.scyld.com/network/via-rhine.html
-PCI: Enabling device 00:0e.0 (0080 -> 0083)
-PCI: No IRQ known for interrupt pin A of device 00:0e.0. Please try using pci=biosirq.
-eth0: VIA VT6105M Rhine-III at 0x1400, 00:09:0f:0a:23:3b, IRQ 0.
-eth0: MII PHY found at address 1, status 0x7869 advertising 05e1 Link cde1.
-PCI: Enabling device 00:0f.0 (0080 -> 0083)
-PCI: No IRQ known for interrupt pin A of device 00:0f.0. Please try using pci=biosirq.
-eth1: VIA VT6105M Rhine-III at 0x1800, 00:09:0f:0a:23:3a, IRQ 0.
-eth1: MII PHY found at address 1, status 0x7849 advertising 05e1 Link 0000.
-PCI: Enabling device 00:10.0 (0080 -> 0083)
-PCI: No IRQ known for interrupt pin A of device 00:10.0. Please try using pci=biosirq.
-eth2: VIA VT6105M Rhine-III at 0x1c00, 00:09:0f:0a:23:39, IRQ 0.
-eth2: MII PHY found at address 1, status 0x7849 advertising 05e1 Link 0000.
-PCI: Enabling device 00:12.0 (0080 -> 0083)
-PCI: No IRQ known for interrupt pin A of device 00:12.0. Please try using pci=biosirq.
-eth3: VIA VT6102 Rhine-II at 0x2000, 00:09:0f:0a:23:38, IRQ 0.
-dhcpcd[299]: dhcpStart: ioctl SIOCSIFFLAGS: Device or resource busy
-
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-shpchp: shpc_init : shpc_cap_offset == 0
-shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/shpchp.o.gz: insmod shpchp failed
-pci_hotplug: PCI Hot Plug PCI Core version: 0.5
-pciehp: PCI Express Hot Plug Controller Driver version: 0.5
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: init_module: No such device
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: Hint: insmod errors can be caused by incorrect module parameters, including invalid I.
-      You may find more information in syslog or the output from dmesg
-insmod: /lib/modules/2.4.33.3/kernel/drivers/hotplug/pciehp.o.gz: insmod pciehp failed
-usb.c: registered new driver usbdevfs
-usb.c: registered new driver hub
-uhci.c: USB Universal Host Controller Interface driver v1.1
-usb-uhci.c: $Revision: 1.275 $ time 02:01:41 Sep  1 2006
-usb-uhci.c: High bandwidth mode enabled
-usb-uhci.c: v1.275:USB Universal Host Controller Interface driver
 Updating shared library links:  /sbin/ldconfig
+INIT: open(/dev/console): Input/output error
+INIT: open(/dev/console): Input/output error
 
 
 Welcome to Linux 2.4.33.3 (ttyS0)
@@ -385,9 +218,38 @@ Welcome to Linux 2.4.33.3 (ttyS0)
 darkstar login: root
 Password: 
 Linux 2.4.33.3.
-Last login: Fri Dec  3 03:01:35 -0600 1999 on ttyS0.
+Last login: Sat Apr  9 03:03:04 -0600 1983 on ttyS0.
 You have mail.
-root@darkstar:~# ls /
-bin/   dev/  home/  lost+found/  mnt/   root/  sys/  usr/  vmlinuz
-boot/  etc/  lib/   media/       proc/  sbin/  tmp/  var/
-root@darkstar:~# 
+root@darkstar:~# modprobe via-rhine
+via-rhine.c:v1.10-LK1.1.19  July-12-2003  Written by Donald Becker
+  http://www.scyld.com/network/via-rhine.html
+eth0: VIA VT6105M Rhine-III at 0x1400, 00:09:0f:0a:23:3b, IRQ 12.
+eth0: MII PHY found at address 1, status 0x7869 advertising 05e1 Link cde1.
+eth1: VIA VT6105M Rhine-III at 0x1800, 00:09:0f:0a:23:3a, IRQ 10.
+eth1: MII PHY found at address 1, status 0x7849 advertising 05e1 Link 0000.
+eth2: VIA VT6105M Rhine-III at 0x1c00, 00:09:0f:0a:23:39, IRQ 12.
+eth2: MII PHY found at address 1, status 0x7849 advertising 05e1 Link 0000.
+eth3: VIA VT6102 Rhine-II at 0x2000, 00:09:0f:0a:23:38, IRQ 11.
+root@darkstar:~# eth0: Setting full-duplex based on MII #1 link partner capability of cde1.
+dhcpcd[252]: broadcasting DHCP_DISCOVER
+
+dhcpcd[252]: dhcpIPaddrLeaseTime=86400 in DHCP server response.
+
+dhcpcd[252]: DHCP_OFFER received from  (192.168.1.1)
+
+dhcpcd[252]: broadcasting DHCP_REQUEST for 192.168.1.154
+
+dhcpcd[252]: dhcpIPaddrLeaseTime=86400 in DHCP server response.
+
+dhcpcd[252]: DHCP_ACK received from  (192.168.1.1)
+
+ping google.com
+PING google.com (142.251.214.78) 56(84) bytes of data.
+64 bytes from ncorda-ao-in-f14.1e100.net (142.251.214.78): icmp_seq=1 ttl=111 time=31.8 ms
+64 bytes from ncorda-ao-in-f14.1e100.net (142.251.214.78): icmp_seq=2 ttl=111 time=31.0 ms
+64 bytes from ncorda-ao-in-f14.1e100.net (142.251.214.78): icmp_seq=3 ttl=111 time=30.7 ms
+64 bytes from ncorda-ao-in-f14.1e100.net (142.251.214.78): icmp_seq=4 ttl=111 time=32.2 ms
+
+--- google.com ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3029ms
+rtt min/avg/max/mdev = 30.713/31.488/32.270/0.631 ms
