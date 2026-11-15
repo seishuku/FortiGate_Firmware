@@ -67,6 +67,32 @@ It would seem that the OS image must have additional setup stage code that does 
 I'm now currently working on seeing if I can get the VGA output working, the header on the board is silkscreened VGAB1... Which is a <i>bit</i> ambiguous, but it has enough pins to be a VGA output and the northbridge on this is AGP with a Trident Blade3D core... So I'm going to explore it.<br>
 I will be a bit sad if it isn't a VGA output though. I do have an alternate way of running DOOM if it comes down to it though. :)
 
+## Update (11/15/2026)
+Well, no sadness here. It took a bit to get it working, but there's VGA!<br>
+![Linux fbdev console](artifacts/Linux_fbdev_console.jpg)
+It's green, because I don't have enough test clips to connect a full RGB, so green it is.<br>
+There are still some minor issues with timing (left shift), but I'm just glad it's working.<br>
+The code in the function trident_vga_init in this commit is the init code reversed from a VGA BIOS mostly as is.<br>
+I pulled the option ROM from an AMI BIOS from a motherboard with the same northbridge chip, they're all mostly the same as pretty much any Trident Blade3D (VID 1023/PID 8500), but the system BIOS I pulled this from was one that actually gave activity on the sync pins (despite the system being dead), so it's the one I went with.<br><br>
+And because I'm legally obligated to do so, here it is running DOOM!<br>
+![Obligatory DOOM](artifacts/Linux_fbdoom.jpg)<br>
+There are still some bugs to work out, a reboot leaves the system is a weird state that causes a kernel panic. So some further work on the init code is needed.<br>
+The VGA init needs to be stripped down to bare minimum anyway, I'm sure most of that isn't needed.<br><br>
+Now pretty much the only thing left to do is get the RTC set up so the system can keep time/date across power cycles. Need to look at the AGP GART as well, last time I tried, the module would hard lock the system... Though that may have changed now that the fbdev driver is working.<br><br>
+The pinout for the VGA header:
+- Pin 1 = Red
+- Pin 2 = Ground
+- Pin 3 = Green
+- Pin 4 = Ground
+- Pin 5 = Blue
+- Pin 6 = Ground
+- Pin 7 = H_Sync
+- Pin 8 = Ground
+- Pin 9 = V_Sync
+- Pin 10 = Ground
+- Pin 11 = ??? at 5 volts (maybe I2C?)
+- Pin 12 = ??? at 5 volts (maybe I2C?)
+
 ## Current console output (this is from real hardware):
 ```FGT-60 early init
 Stage 1: VT8231/UART up, VT8601 + SDRAM init...

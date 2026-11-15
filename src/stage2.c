@@ -168,15 +168,20 @@ int boot_linux(void *kernel_image_start, size_t total_image_size, const char *cm
 	uint8_t *e820Count=params+0x1E8;
 	E820_t *e820=(E820_t *)(params+0x2D0);
 
-	e820[0].addr=0x00000000;
-	e820[0].size=0x00100000;
-	e820[0].type=E820_RESERVED;
+	e820[0].addr = 0x00000000;
+	e820[0].size = 0x00100000;
+	e820[0].type = E820_RESERVED;
 
-	e820[1].addr=0x00100000;
-	e820[1].size=ram_size-0x00100000;
-	e820[1].type=E820_RAM;
+	e820[1].addr = 0x00100000;
+	e820[1].size = ram_size - 0x00100000 - 0x00400000;
+	e820[1].type = E820_RAM;
 
-	*e820Count=2;
+	/* Reserve the top 4MB for the video framebuffer */
+	e820[2].addr = ram_size - 0x00400000;
+	e820[2].size = 0x00400000;
+	e820[2].type = E820_RESERVED;
+
+	*e820Count=3;
 
 	// Legacy fields
 	*(uint32_t *)(params+0x1E0)=(ram_size-0x00100000)>>10; // alt_mem_k
@@ -269,6 +274,9 @@ void stage2_main(void)
 	pci_assign_irq(0x00, 0x0e, 0x00, 12); // eth0 (WAN2)
 	pci_assign_irq(0x00, 0x0f, 0x00, 10); // eth1 (WAN1)
 	pci_assign_irq(0x00, 0x10, 0x00, 9); // eth2 (DMZ)
+
+	// VGA, not sure if this is correct
+	pci_assign_irq(0x01, 0x00, 0x00, 11);
 
 	uint32_t totalRAM=pci_read8(PCI_DEV(0, 0, 0, 0x5b))<<3;                /* NB Rx5B = end of last DRAM row, 8 MB units -> MB */
 	uart_puts("Total RAM: ");
