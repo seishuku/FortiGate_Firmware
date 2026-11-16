@@ -523,6 +523,68 @@ static uint32_t early_cache_init(void)
 	return ram_mb<<20;
 }
 
+static inline uint8_t rtc_read(uint8_t reg)
+{
+    outb(reg|0x80, 0x70);
+    return inb(0x71);
+}
+
+static inline void rtc_write(uint8_t reg, uint8_t val)
+{
+    outb(reg|0x80, 0x70);
+    outb(val, 0x71);
+}
+
+void rtc_init(void)
+{
+	// Enable RTC and upper 128B CMOS bank
+	pci_write8(SB0(0x48), pci_read8(SB0(0x48))|(1<<3)|(1<<5));
+
+	// Enable I/O decoding for ports 0x70-0x71 (0x5A bit 4)
+	pci_write8(SB0(0x5a), pci_read8(SB0(0x5a))|(1<<4));
+
+	// Enable I/O decoding for extended Ports 0x72-0x73 (0x5B bit 3)
+	pci_write8(SB0(0x5b), pci_read8(SB0(0x5b))|(1<<3));
+
+	uint8_t freqSel=rtc_read(0x0a);
+	uint8_t valid=rtc_read(0x0d);
+
+	// Check VRT (bit 7 of Reg D) and 32.768kHz oscillator divider (0x20 in Reg A)
+	if(!(valid&0x80)||((freqSel&0x70)!=0x20))
+	{
+		uart_puts("CMOS battery dead?\n");
+
+		// Battery dead or oscillator off: halt updates, set 24h BCD mode
+		rtc_write(0x0B, 0x82);
+
+		// Enable 32.768 kHz oscillator + 1024 Hz periodic base
+		rtc_write(0x0A, 0x26);
+
+		// Initialize fallback date: 2000-01-01 00:00:00 (BCD)
+		rtc_write(0x00, 0x00); // Seconds
+		rtc_write(0x02, 0x00); // Minutes
+		rtc_write(0x04, 0x00); // Hours
+		rtc_write(0x06, 0x07); // Day of week
+		rtc_write(0x07, 0x01); // Day of month
+		rtc_write(0x08, 0x01); // Month
+		rtc_write(0x09, 0x00); // Year
+		rtc_write(0x32, 0x20); // Century
+
+		// Clear extended ACPI alarm registers
+		rtc_write(0x7D, 0x00); // Date Alarm
+		rtc_write(0x7E, 0x00); // Month Alarm
+	}
+
+	// Release clock (clear SET bit), keep 24h BCD, disable PIE/AIE/UIE for Linux
+	rtc_write(0x0B, 0x02);
+
+	// Read Reg C to clear any pending IRQ8 flags
+	(void)rtc_read(0x0C);
+
+	// Unmask NMI (bit 7 = 0) before returning
+	outb(0x0D, 0x70);
+}
+
 static uint32_t main(void)
 {
     sb_prologue();
@@ -534,6 +596,9 @@ static uint32_t main(void)
 
 	uart_puts("VT8601 setup + SDRAM...\n");
 	nb_init();
+
+	uart_puts("RTC configuration...\n");
+	rtc_init();
 
 	uart_puts("Trident PCI configuration...\n");
 	trident_pci_init();
