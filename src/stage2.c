@@ -166,18 +166,19 @@ int boot_linux(void *kernel_image_start, size_t total_image_size, const char *cm
 	uint8_t *e820Count=params+0x1E8;
 	E820_t *e820=(E820_t *)(params+0x2D0);
 
-	e820[0].addr = 0x00000000;
-	e820[0].size = 0x00100000;
-	e820[0].type = E820_RESERVED;
+	e820[0].addr=0x00000000;
+	e820[0].size=0x00100000;
+	e820[0].type=E820_RESERVED;
 
-	e820[1].addr = 0x00100000;
-	e820[1].size = ram_size - 0x00100000 - 0x00400000;
-	e820[1].type = E820_RAM;
+	e820[1].addr=0x00100000;
+	e820[1].size=ram_size-0x00100000;
+	e820[1].type=E820_RAM;
 
-	/* Reserve the top 4MB for the video framebuffer */
-	e820[2].addr = ram_size - 0x00400000;
-	e820[2].size = 0x00400000;
-	e820[2].type = E820_RESERVED;
+	// Reserve the top 4MB for UMA
+	// TODO: Detect this from northbridge registers?
+	e820[2].addr=ram_size;
+	e820[2].size=0x00400000;
+	e820[2].type=E820_RESERVED;
 
 	*e820Count=3;
 
