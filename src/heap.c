@@ -29,10 +29,10 @@ static uintptr_t align_up(uintptr_t value)
     return (value+HEAP_ALIGNMENT-1u)&~(uintptr_t)(HEAP_ALIGNMENT-1u);
 }
 
-int heap_init(void)
+int heap_init(uint32_t heapSize)
 {
     uintptr_t start=align_up((uintptr_t)0x100000); // beginning of the physical heap memory, has to be at 0x100000 due to legacy hardware using addresses below
-    uintptr_t end=(uintptr_t)pci_read8(PCI_DEV(0, 0, 0, 0x5b))<< 3 << 20; // top of memory as reported by the northbridge
+    uintptr_t end=(uintptr_t)heapSize; // top of memory
 
     heapReady=false;
     heapHead=0;

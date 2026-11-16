@@ -295,80 +295,37 @@ static void trident_pci_init(void)
     pci_write16(PCI_DEV(0, 1, 0, 0x06), 0xFFFF);
 }
 
-// Register read/write helpers
-#define SR_W(i, v)         \
-	do                     \
-	{                      \
-		outb((i), 0x3C4); \
-		outb((v), 0x3C5); \
-	} while(0)
+// Sequencer register read/write helpers
+static inline void sr_w(uint8_t i, uint8_t v)
+{
+	outb(i, 0x3C4);
+	outb(v, 0x3C5);
+}
 
-#define CR_W(i, v)         \
-	do                     \
-	{                      \
-		outb((i), 0x3D4); \
-		outb((v), 0x3D5); \
-	} while(0)
-
-#define GR_W(i, v)         \
-	do                     \
-	{                      \
-		outb((i), 0x3CE); \
-		outb((v), 0x3CF); \
-	} while(0)
-
-static uint8_t sr_r(uint8_t i)
+static inline uint8_t sr_r(uint8_t i)
 {
 	outb(i, 0x3C4);
 	return inb(0x3C5);
 }
-static uint8_t cr_r(uint8_t i)
+
+// CRT controller register read/write
+static inline uint8_t cr_r(uint8_t i)
 {
 	outb(i, 0x3D4);
 	return inb(0x3D5);
 }
-static uint8_t gr_r(uint8_t i)
+
+static inline void cr_w(uint8_t i, uint8_t v)
+{
+	outb(i, 0x3D4);
+	outb(v, 0x3D5);
+}
+
+// Graphics controller register write
+static inline void gr_w(uint8_t i, uint8_t v)
 {
 	outb(i, 0x3CE);
-	return inb(0x3CF);
-}
-
-// ROM 0x2532 / 0x2559: "variant" probes that read NB reg 0x68.
-// Returns 1 for the ROM's carry-set case, 0 for carry-clear.
-static int nb_0x68_probe_a(void) /* ROM 0x2532 */
-{
-	uint16_t v=pci_read32(NB(0x68))&0xC001;
-	return !(v==0x4000||v==0x0001);
-}
-
-static int nb_0x68_probe_b(void) /* ROM 0x2559 */
-{
-	uint16_t v=pci_read32(NB(0x68))&0xC003;
-	return !(v==0x4001||v==0x0002);
-}
-
-// ROM 0x2580. Returns carry flag semantics (1 = carry set).
-static int memcfg_carry(void)
-{
-	if(pci_read32(NB(0x00))==0x31121106)
-	{
-		// bridge (0:1.0) reg 0x48 low byte: 0 -> read ID of 1:0.0 -> 1
-		pci_write8(PCI_DEV(0, 1, 0, 0x48), 0x00);
-
-		uint32_t id=pci_read32(PCI_DEV(1, 0, 0, 0x00));
-
-		pci_write8(PCI_DEV(0, 1, 0, 0x48), 0x01);
-
-		if(id!=0x85201023)
-			return 1;
-
-			return nb_0x68_probe_a();
-	}
-	
-	if(pci_read32(NB(0xF4))&0x10000)
-		return 1;
-
-	return nb_0x68_probe_b();
+	outb(v, 0x3CF);
 }
 
 // ROM 0x260f: CR1F low nibble from UMA size field, CR1A/1B/1C from NB config
@@ -383,134 +340,74 @@ static void memory_interface_init(void)
 	if(uma==0x30)
 		code=0x4;
 
-	CR_W(0x1F, (cr_r(0x1F)&0xF0)|code);
+	cr_w(0x1F, (cr_r(0x1F)&0xF0)|code);
 
-	if(memcfg_carry())
-	{
-		CR_W(0x1A, 0x07);
-		CR_W(0x1B, 0x07);
-		CR_W(0x1C, 0x07);
-	}
-	else
-	{
-		CR_W(0x1A, 0x02);
-		CR_W(0x1B, 0x07);
-		CR_W(0x1C, 0x02);
-	}
-}
-
-// ROM table at 0x589a, written through the 0x395c/0x3976 register writer.
-// ROM index high nibble 9/A/C maps to GR 0x2x/0x3x/0x5x; 0x21 is CR21.
-static const struct
-{
-	uint8_t idx, val;
-} gr_table[]=
-{
-	{ 0x20, 0x80 },
-	{ 0x21, 0xC1 },
-	{ 0x22, 0x12 },
-	{ 0x23, 0x08 },
-	{ 0x24, 0xE0 },
-	{ 0x25, 0x00 },
-	{ 0x26, 0x08 },
-	{ 0x2A, 0x81 },
-	{ 0x2C, 0x04 },
-	{ 0x2F, 0x23 },
-	{ 0x30, 0x00 },
-	{ 0x50, 0x10 },
-	{ 0x5A, 0x03 },
-	{ 0x5D, 0x7F },
-};
-
-static void gr_table_init(void)
-{
-	// ROM 0x599c: GR41[2:0] selects a config record (keys 0,1,2 present in
-	// ROM data at 0x9e62/0x9ed8/0x9fa6) whose byte +4 & 0x70 goes to GR5B:
-	//   key0 -> 0x00, key1 -> 0x10, key2 -> 0x20.  Unknown key -> key0.
-	uint8_t key=gr_r(0x41)&7;
-	uint8_t gr5b=(key==1)?0x10:(key==2)?0x20:0x00;
-
-	GR_W(0x5B, gr5b);
-
-	int i;
-	for(i=0;i<sizeof(gr_table)/sizeof(gr_table[0]);i++)
-		GR_W(gr_table[i].idx, gr_table[i].val);
-
-	// last table entry (index 0x21 -> CR21 = 0x00); the ROM's writer clears CR11 bit7 around CRTC writes
-	uint8_t cr11=cr_r(0x11);
-	CR_W(0x11, cr11&0x7F);
-	CR_W(0x21, 0x00);
-	CR_W(0x11, cr11);
+	cr_w(0x1A, 0x07);
+	cr_w(0x1B, 0x07);
+	cr_w(0x1C, 0x07);
 }
 
 // Do VGA device initialization
 static void trident_vga_init(void)
 {
 	// ROM 0x5876: legacy VGA enable
-	outb(0x01, 0x3C3);
-	outb(0x08, 0x46E8); // (0x01 << 3)
-	outb(0x67, 0x3C2);  // color, IO @3Dx, RAM enable, 25MHz
+	outb(0x01, 0x3C3); // VGA video subsystem enable
+	outb(0x08, 0x46E8); // VGA display adapter enable
+	outb(0x67, 0x3C2);  // Misc outputs, sets color, IO, RAM enable, 25MHz?
 
-	// ROM 0x232f: unlock extended regs
-	SR_W(0x11, 0x92);
+	sr_w(0x11, 0x92); // Unlock extended regs
 
-	// ROM 0x3ee0 (no SMBus device 0x40 assumed -> carry path)
-	CR_W(0xC2, 0x00); // 0x40 if SMBus dev 0x40 answered
-	CR_W(0xC0, 0x00);
-	CR_W(0xC1, 0x41);
-	CR_W(0xCF, 0x03);
+	// Undocumented, no idea.
+	// It's needed.
+	cr_w(0xC2, 0x00);
+	cr_w(0xC0, 0x00);
+	cr_w(0xC1, 0x41);
+	cr_w(0xCF, 0x03);
 
-	// ROM 0x24b3: sequencer block
-	SR_W(0x0B, 0xF3); // write SR0B->"old" register set
-	SR_W(0x0D, 0x28);
-	(void)sr_r(0x0B); // read  SR0B->"new" register set
-	SR_W(0x0D, 0x00);
+	// Set up sequencer block
+	sr_w(0x0B, 0xF3); // "old" register set mode (for SRD, SRE, and GRE registers)
+	sr_w(0x0D, 0x08); // Set CPU bandwidth select to non-interrupted access
 
-	SR_W(0x01, 0x00);
-	SR_W(0x1A, 0xFF);
-	SR_W(0x1B, 0xFF);
-	SR_W(0x20, 0x04);
-	SR_W(0x24, 0x4F);
-	SR_W(0x37, 0x30);
-	SR_W(0x38, 0x10);
-	SR_W(0xD9, 0x08);
+	(void)sr_r(0x0B); // "new" register set mode (for SRD, SRE, and GRE registers)
+	sr_w(0x0D, 0x00); // Set video clock divide by 1, FIFO empty level 0
 
-	// ROM 0x260f: memory interface (depends on chipset/UMA)
+	sr_w(0x1A, 0xFF); // VCLK2 generator numerator - ??
+	sr_w(0x1B, 0xFF); // VCLK2 generator K-Factor and denuminator - ??
+	sr_w(0x20, 0x04); // Clock synth and RAMDAC setup - Video mode enable
+	sr_w(0x24, 0x4F); // Power management control - DAC on/Disable MCLK VCO/Slow MCLK/1 clock input divisor/Disable VCLK2 VCO
+	sr_w(0x37, 0x30); // Video key mode - Feature Connector Input Pixel Clock Tuning@12ns
+	sr_w(0x38, 0x10); // Advanced feature connector control - Invert DCLK output polarity
+	sr_w(0xD9, 0x08); // Digital TV interface control - Set VGAHS, VGAVS, and PCLK x 2
+
+	// Set up memory interface (depends on chipset/UMA)
 	memory_interface_init();
 
-	// ROM 0x24e7..0x252a: CRTC-space extended regs
-	CR_W(0x3A, 0x30);
-	CR_W(0x39, 0x05);
-	CR_W(0x1E, 0x00);
-	CR_W(0x20, 0x20);
-	CR_W(0x25, 0x87);
-	CR_W(0x29, 0x04);
-	CR_W(0x2D, 0x92);
-	CR_W(0x2E, 0x00);
-	CR_W(0x2F, 0xFF);
-	CR_W(0x30, 0x0F);
-	CR_W(0x33, 0x00);
-	CR_W(0x36, 0x00);
-	CR_W(0x38, 0x10);
-	CR_W(0x3B, 0x31);
-	CR_W(0x59, 0x00);
-	CR_W(0x5A, 0x00);
-	CR_W(0x8E, 0x00);
+	// CRTC extended regs
+	cr_w(0x3A, 0x30); // Physical address control - Both IO/Memory address linearization
+	cr_w(0x39, 0x05); // PCI interface control - VGA IO space can be memory mapped/PCI burst read
+	cr_w(0x20, 0x20); // Command FIFO - Enable write buffer
+	cr_w(0x25, 0x87); // RAMDAC read/write timing - Set wait states/Pixel clock tristate control disable
+	cr_w(0x29, 0x04); // RAMDAC mode - Internal RAMDAC
+	cr_w(0x2D, 0x92); // GE timing control - Buffer read delay cycles/Sample clock delay
+	cr_w(0x2F, 0xFF); // Performance tuning - VCLK1/Normal read cycle/8 FIFO depth/2 refresh cycles per line
+	cr_w(0x30, 0x0F); // Something with FIFO latency control?
+	cr_w(0x36, 0x00); // Graphics/Video engine control
+	cr_w(0x38, 0x10); // Pixel bus mode - Standard VGA 64bit config
+	cr_w(0x3B, 0x31); // Clock and tuning - Vert retrace memory refresh enable/??
 
-	// ROM 0x58c7 (SMBus dev 0x70 writes skipped) + 0x599c
-	gr_table_init();
+	// Power management
+	gr_w(0x20, 0x80); // Standby timer control
+	gr_w(0x21, 0xC1); // Power management control 1
+	gr_w(0x22, 0x12); // Power management control 2
+	gr_w(0x23, 0x08); // Power status
+	gr_w(0x24, 0xE0); // Soft power control
+	gr_w(0x25, 0x00); // Power control select
+	gr_w(0x26, 0x08); // DPMS control
+	gr_w(0x2A, 0x81); // Suspend pin timer
+	gr_w(0x2C, 0x04); // Misc pin control
+	gr_w(0x2F, 0x23); // Misc internal control
 
-	// ROM 0x59ef: display-type strap (2/3/4); 2 is the fall-through value when no SMBus device 0x70/0x40 responds
-	GR_W(0x5A, 0x02);
-	GR_W(0x5D, 0x7F);
-
-	// ROM 0x5863 (runs after the ROM's INT10 mode set)
-	GR_W(0x5E, 0x44);
-	GR_W(0x5F, 0x14);
-	CR_W(0x58, 0x62);
-
-	// ROM 0x580c/0x233f: relock extended regs
-	SR_W(0x11, 0x87);
+	sr_w(0x11, 0x87); // Relock extended regs
 }
 
 static uint32_t read_msr_lo(uint32_t index)
@@ -587,7 +484,7 @@ uint32_t test_ram(void)
     return count;
 }
 
-static void early_cache_init(void)
+static uint32_t early_cache_init(void)
 {
 	/* Caches are still off (CD|NW set in entry32).  Disable the MTRRs while reprogramming them. */
 	wbinvd();
@@ -622,21 +519,27 @@ static void early_cache_init(void)
 	/* Caches on. */
 	write_cr0(read_cr0()&~(CR0_CD|CR0_NW));
 	wbinvd();
+
+	return ram_mb<<20;
 }
 
-static void main(void)
+static uint32_t main(void)
 {
     sb_prologue();
 	delay_post();
 	uart_init();
 
 	uart_puts("\nFGT-60 early init\n");
-    uart_puts("Stage 1: VT8231/UART up, VT8601 + SDRAM init...\n");
+    uart_puts("Stage 1:\n\n");
 
+	uart_puts("VT8601 setup + SDRAM...\n");
 	nb_init();
 
+	uart_puts("Trident PCI configuration...\n");
 	trident_pci_init();
+	uart_puts("Trident VGA configuration...\n");
 	trident_vga_init();
 
-	early_cache_init();
+	uart_puts("Enabling cache and testing RAM...\n");
+	return early_cache_init();
 }

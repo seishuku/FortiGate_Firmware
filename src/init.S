@@ -158,6 +158,9 @@ stage2_entry:
 	cli
 	cld
 
+    /* Save stage1 return value */
+    mov  ebx, eax
+
 	/* Copy stage 2 from flash to its RAM execution address. */
 	mov  esi, offset __stage2_load
 	mov  edi, offset __stage2_start
@@ -177,6 +180,8 @@ stage2_entry:
 	xor  eax, eax
 	rep  stosd
 
+	/* pass stage1 return value as argument */
+	push ebx
 	call stage2_main
 
 stage2_hang:

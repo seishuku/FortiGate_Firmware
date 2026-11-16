@@ -254,7 +254,7 @@ void pci_assign_irq(uint8_t bus, uint8_t dev, uint8_t func, const uint8_t irq)
 	outb((uint8_t)(int_bits>>8), 0x4d1);
 }
 
-void stage2_main(void)
+void stage2_main(uint32_t totalRAM)
 {
 	uart_puts("\nStage 2:\n");
 
@@ -262,13 +262,13 @@ void stage2_main(void)
 	uart_puts(bss_probe==0 ? "zeroed" : "NOT ZERO");
 	uart_puts(", .data ");
 	uart_puts(data_probe==0x600dc0de ? "intact" : "BAD");
-	uart_puts(", stack ok\n");
+	uart_puts(", stack ok\n\n");
 
 	// Southbridge USB IRQ
 	pci_assign_irq(0x00, 0x11, 0x02, 10);
 
 	// Southbridge ethernet IRQ
-	pci_assign_irq(0x00, 0x12, 0x00, 11); // eth3 (connected to 4 port hub)
+	pci_assign_irq(0x00, 0x12, 0x00, 11); // eth3 (4 port hub)
 
 	// 3x RHINE-III IRQs
 	pci_assign_irq(0x00, 0x0e, 0x00, 12); // eth0 (WAN2)
@@ -277,26 +277,25 @@ void stage2_main(void)
 
 	// VGA, not sure if this is correct
 	pci_assign_irq(0x01, 0x00, 0x00, 11);
+	uart_putc('\n');
 
-	uint32_t totalRAM=pci_read8(PCI_DEV(0, 0, 0, 0x5b))<<3;                /* NB Rx5B = end of last DRAM row, 8 MB units -> MB */
-	uart_puts("Total RAM: ");
-	uart_hex32(totalRAM);
-	uart_puts(" MB (from as reported by northbridge)\n");
-	totalRAM<<=20; // to bytes;
-
-	if(!heap_init())
+	if(!heap_init(totalRAM))
 	{
 		uart_puts("Heap initialized successfully.\n");
 		uart_puts("Heap available: ");
-		uart_hex32(heap_available());
+		uart_uint32(heap_available());
 		uart_puts(" bytes, largest free block: ");
-		uart_hex32(heap_largest_free());
+		uart_uint32(heap_largest_free());
 		uart_puts(" bytes\n");
 	}
 	else
 		uart_puts("Heap initialization failed.\n");
+	uart_putc('\n');
 
-	// reserve a chunk of memory to space out the kernel and initrd loads, so they don't get wiped out when the kernel is set up and copied into it's entry location.
+	// reserve a chunk of memory to space out the kernel load,
+	// so they don't get wiped out when the kernel is set up
+	// and copied into it's entry location.
+	// (most likely destorying stack and anything else)
 	void *reserved=heap_alloc(16*1024*1024);
 	(void)reserved; // unused
 
