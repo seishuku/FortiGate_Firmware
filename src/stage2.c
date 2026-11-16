@@ -13,8 +13,6 @@ static volatile uint32_t data_probe=0x600dc0de;		// must be intact: .data came t
 
 static ext2_fs_t rootfs;
 
-#define NB(r) PCI_DEV(0, 0, 0, (r))
-
 // Linux boot protocol constants
 #define BOOT_MAGIC_HDRS     0x53726448  // "HdrS"
 #define MIN_BOOT_VERSION    0x0202
