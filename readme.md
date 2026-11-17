@@ -98,6 +98,10 @@ The pinout for the VGA header:
 - Pin 11 = ??? at 5 volts (maybe I2C?)
 - Pin 12 = ??? at 5 volts (maybe I2C?)
 
+## Update (11/17/2026)
+Found some more test clips, so here's a better VGA capture of DOOM (also apparently the video mode depth was set wrong in the previous capture, it should have looked much better)
+![Obligatory better DOOM](artifacts/Linux_fbdoom-2.jpg)
+
 ## Current console output (this is from real hardware):
 ```FGT-60 early init
 Stage 1: VT8231/UART up, VT8601 + SDRAM init...
