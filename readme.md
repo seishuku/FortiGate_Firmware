@@ -17,6 +17,8 @@ Basically a standard PC, including:
 - 40 pin IDE interface
 - CF card slot
 - Possibly a header for PS2 keyboard/mouse (unverified)
+
+![Device under test](artifacts/Device_under_test.jpg)
 # 11/7/2026
 Doing initial testing using a VIA EPIA ITX board as a base showed that it could bring up the basic hardware, however the EPIA uses DIMMs for memory and are configured via SPD chip over the SMBus.<br>
 The FortiGate does have a I2C EEPROM on board, but I'm unsure what it contains, it might be memory config, but could just be ethernet interface MACs.<br><br>
