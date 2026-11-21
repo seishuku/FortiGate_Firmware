@@ -101,15 +101,16 @@ static void sb_prologue(void)
 	// Enable ISA IRQ assertion through SERIRQ.
     pci_write8(SB0(0x52), (pci_read8(SB0(0x52))&~0x04)|0x08);
 
-	pci_write8 (SB0(0x6c), pci_read8(SB0(0x6c))|0x80); // internal IO decode
+	pci_write8(SB0(0x6c), pci_read8(SB0(0x6c))|0x80); // internal IO decode
 
-	pci_write8 (SB0(0x40), pci_read8(SB0(0x40))|0x44); // IO recovery time
-	pci_write8 (SB0(0x42), pci_read8(SB0(0x42))|0xf0); // something award does?
-	pci_write8 (SB0(0x47), pci_read8(SB0(0x47))|0x20); // enable legacy PIC ports
-	pci_write8 (SB0(0x4a), pci_read8(SB0(0x4a))|0x08); // dummy PCI request
-	pci_write8 (SB0(0x4c), (pci_read8(SB0(0x4c))&~0x0f)|0x04); // set default IDE interrupt values
-	pci_write8 (SB0(0x4f), pci_read8(SB0(0x4f))|0x08); // INIT# as CPU reset
-	pci_write8 (SB0(0x51), pci_read8(SB0(0x51))|0x18);
+	pci_write8(SB0(0x40), pci_read8(SB0(0x40))|0x44); // IO recovery time
+	pci_write8(SB0(0x42), pci_read8(SB0(0x42))|0xf0); // something award does?
+	pci_write8(SB0(0x47), pci_read8(SB0(0x47))|0x20); // enable legacy PIC ports
+	pci_write8(SB0(0x4a), pci_read8(SB0(0x4a))|0x09); // dummy PCI request
+	pci_write8(SB0(0x4c), (pci_read8(SB0(0x4c))&~0x0f)|0x04); // set default IDE interrupt values
+	pci_write8(SB0(0x4f), pci_read8(SB0(0x4f))|0x08); // INIT# as CPU reset
+	pci_write8(SB0(0x51), pci_read8(SB0(0x51))|0x1f); // Enable keyboard/mouse/RTC/LAN
+
 	pci_write32(SB0(0x54), 0xc0a9b000); // PCI IRQ level select and PCI IRQ[a,b,c,d] routing
 	pci_write32(SB0(0x58), 0x00000003);
 	pci_write32(SB0(0x5c), 0x40f00000);
@@ -141,6 +142,14 @@ static void sb_prologue(void)
 	// Force interrupts to use compat mode - just like Award bios
 	pci_write8(SB1(0x3d), 0x00);
 	pci_write8(SB1(0x3c), 0xff);
+
+	pci_write8(SB1(0x09), (pci_read8(SB1(0x09)) & ~0x05) | 0x80); /* Compat mode + BMIDE capable */
+	pci_write8(SB1(0x0D), 0x40);                                  /* Latency timer = 64 */
+	pci_write32(SB1(0x20), 0x0000CC01);                           /* Assign BAR4 BMIDE I/O = 0xCC00 */
+
+	pci_write8(SB0(0x59), pci_read8(SB0(0x59))|0x04);
+
+	pci_write8(SB0(0x41), pci_read8(SB0(0x41)) | 0x0f);
 }
 
 /* ---- VT8601 SDRAM command cycle: Rx6C[2:0] = cmd (other bits preserved) ---- */

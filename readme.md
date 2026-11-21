@@ -65,44 +65,6 @@ Got 3 of the 4 ethernet controllers working, the south bridge integrated, first 
 I can't figure out what's going on with the third RHINE chip though, I've literally tried every IRQ including the ones that you obviously shouldn't use and nothing.<br>
 I guess I'll put that off to the side for now and move on to the next task.
 
-## Update (11/14/2026)
-Got the remaining ethernet controller working (ethernet 2/DMZ port).<br>
-Turns out the original ROM was doing a generic IRQ setup, probably just enough to get the OS image loaded from the CF card and booted.<br>
-It would seem that the OS image must have additional setup stage code that does more hardware configuration, because I've enabled the previously disable PCI IRQ B line and routed eth2 to IRQ 9 and now it works.</br>
-I'm now currently working on seeing if I can get the VGA output working, the header on the board is silkscreened VGAB1... Which is a <i>bit</i> ambiguous, but it has enough pins to be a VGA output and the northbridge on this is AGP with a Trident Blade3D core... So I'm going to explore it.<br>
-I will be a bit sad if it isn't a VGA output though. I do have an alternate way of running DOOM if it comes down to it though. :)
-
-## Update (11/15/2026)
-Well, no sadness here. It took a bit to get it working, but there's VGA!<br>
-![Linux fbdev console](artifacts/Linux_fbdev_console.jpg)
-It's green, because I don't have enough test clips to connect a full RGB, so green it is.<br>
-There are still some minor issues with timing (left shift), but I'm just glad it's working.<br>
-The code in the function trident_vga_init in this commit is the init code reversed from a VGA BIOS mostly as is.<br>
-I pulled the option ROM from an AMI BIOS from a motherboard with the same northbridge chip, they're all mostly the same as pretty much any Trident Blade3D (VID 1023/PID 8500), but the system BIOS I pulled this from was one that actually gave activity on the sync pins (despite the system being dead), so it's the one I went with.<br><br>
-And because I'm legally obligated to do so, here it is running DOOM!<br>
-![Obligatory DOOM](artifacts/Linux_fbdoom.jpg)<br>
-There are still some bugs to work out, a reboot leaves the system is a weird state that causes a kernel panic. So some further work on the init code is needed.<br>
-The VGA init needs to be stripped down to bare minimum anyway, I'm sure most of that isn't needed.<br><br>
-Now pretty much the only thing left to do is get the RTC set up so the system can keep time/date across power cycles. Need to look at the AGP GART as well, last time I tried, the module would hard lock the system... Though that may have changed now that the fbdev driver is working.<br><br>
-The pinout for the VGA header:
-- Pin 1 = Red
-- Pin 2 = Ground
-- Pin 3 = Green
-- Pin 4 = Ground
-- Pin 5 = Blue
-- Pin 6 = Ground
-- Pin 7 = H_Sync
-- Pin 8 = Ground
-- Pin 9 = V_Sync
-- Pin 10 = Ground
-- Pin 11 = ??? at 5 volts (maybe I2C?)
-- Pin 12 = ??? at 5 volts (maybe I2C?)
-
-## Update (11/17/2026)
-Found some more test clips, so here's a better VGA capture of DOOM (also apparently the video mode depth was set wrong in the previous capture, it should have looked much better)
-![Obligatory better DOOM](artifacts/Linux_fbdoom-2.jpg)
-
-## Current console output (this is from real hardware):
 ```FGT-60 early init
 Stage 1: VT8231/UART up, VT8601 + SDRAM init...
 ................................................................................................................................
@@ -295,3 +257,110 @@ PING google.com (142.251.214.78) 56(84) bytes of data.
 --- google.com ping statistics ---
 4 packets transmitted, 4 received, 0% packet loss, time 3029ms
 rtt min/avg/max/mdev = 30.713/31.488/32.270/0.631 ms
+```
+
+## Update (11/14/2026)
+Got the remaining ethernet controller working (ethernet 2/DMZ port).<br>
+Turns out the original ROM was doing a generic IRQ setup, probably just enough to get the OS image loaded from the CF card and booted.<br>
+It would seem that the OS image must have additional setup stage code that does more hardware configuration, because I've enabled the previously disable PCI IRQ B line and routed eth2 to IRQ 9 and now it works.</br>
+I'm now currently working on seeing if I can get the VGA output working, the header on the board is silkscreened VGAB1... Which is a <i>bit</i> ambiguous, but it has enough pins to be a VGA output and the northbridge on this is AGP with a Trident Blade3D core... So I'm going to explore it.<br>
+I will be a bit sad if it isn't a VGA output though. I do have an alternate way of running DOOM if it comes down to it though. :)
+
+## Update (11/15/2026)
+Well, no sadness here. It took a bit to get it working, but there's VGA!<br>
+![Linux fbdev console](artifacts/Linux_fbdev_console.jpg)
+It's green, because I don't have enough test clips to connect a full RGB, so green it is.<br>
+There are still some minor issues with timing (left shift), but I'm just glad it's working.<br>
+The code in the function trident_vga_init in this commit is the init code reversed from a VGA BIOS mostly as is.<br>
+I pulled the option ROM from an AMI BIOS from a motherboard with the same northbridge chip, they're all mostly the same as pretty much any Trident Blade3D (VID 1023/PID 8500), but the system BIOS I pulled this from was one that actually gave activity on the sync pins (despite the system being dead), so it's the one I went with.<br><br>
+And because I'm legally obligated to do so, here it is running DOOM!<br>
+![Obligatory DOOM](artifacts/Linux_fbdoom.jpg)<br>
+There are still some bugs to work out, a reboot leaves the system is a weird state that causes a kernel panic. So some further work on the init code is needed.<br>
+The VGA init needs to be stripped down to bare minimum anyway, I'm sure most of that isn't needed.<br><br>
+Now pretty much the only thing left to do is get the RTC set up so the system can keep time/date across power cycles. Need to look at the AGP GART as well, last time I tried, the module would hard lock the system... Though that may have changed now that the fbdev driver is working.<br><br>
+The pinout for the VGA header:
+- Pin 1 = Red
+- Pin 2 = Ground
+- Pin 3 = Green
+- Pin 4 = Ground
+- Pin 5 = Blue
+- Pin 6 = Ground
+- Pin 7 = H_Sync
+- Pin 8 = Ground
+- Pin 9 = V_Sync
+- Pin 10 = Ground
+- Pin 11 = ??? at 5 volts (maybe I2C?)
+- Pin 12 = ??? at 5 volts (maybe I2C?)
+
+## Update (11/17/2026)
+Found some more test clips, so here's a better VGA capture of DOOM (also apparently the video mode depth was set wrong in the previous capture, it should have looked much better)
+![Obligatory better DOOM](artifacts/Linux_fbdoom-2.jpg)
+
+## Update (11/21/2026)
+Got SeaBIOS working.<br>
+It's not super useful because the USB keyboard legacy support seems to be a bit unreliable, it kind of works in DOS, but not all programs, sometimes booting from a USB flash drive works, sometimes it's not detected at all, sometimes in DOS it just drops out completely.<br>
+Not sure what's going on with that, but it does work.<br>
+This is also using the VGA BIOS that I recovered for reverse engineering the VGA init from, since SeaBIOS needs real-mode drivers a real VGA BIOS needs to be used.
+```FGT-60 early init
+Stage 1:
+
+VT8601 setup + SDRAM...
+RTC configuration...
+Trident PCI configuration...
+Trident VGA configuration...
+Enabling cache and testing RAM...
+............................................................................................................................
+Counted RAM: 124MB
+
+Stage 2:
+C runtime: .bss zeroed, .data intact, stack ok
+
+Assigning IRQ 10 to 0:17.2
+Assigning IRQ 11 to 0:18.0
+Assigning IRQ 12 to 0:14.0
+Assigning IRQ 10 to 0:15.0
+Assigning IRQ 9 to 0:16.0
+Assigning IRQ 11 to 1:0.0
+
+SeaBIOS (version rel-1.17.0-24-g28aa4634-dirty-20261121_151124-office)
+BUILD: gcc: (GCC) 16.2.1 20260810 binutils: (GNU Binutils) 2.47
+Relocating init from 0x000f05c0 to 0x06bfaec0 (size 20640)
+Found 12 PCI devices (max PCI bus is 01)
+Running option rom at c000:0003
+Turning on vga text mode console
+UHCI init on dev 00:11.2 (io=fce0)
+USB keyboard initialized
+WARNING - Timeout at wait_pipe:414!
+Timeout on wait_pipe 0x06bfa8f0 (td=0x00006d10 s=440007 c=c1/2)
+WARNING - Timeout at i8042_wait_read:38!
+ATA controller 1 at 1f0/3f4/0 (irq 14 dev 89)
+ata0-0: CactusFlashCard ATA-5 Hard-Disk (999 MiBytes)
+Searching bootorder for: /pci@i0cf8/*@11,1/drive@0/disk@0
+ATA controller 2 at 170/374/0 (irq 15 dev 89)
+Searching bootorder for: HALT
+Found 1 serial ports
+Searching bootorder for: HALT
+drive 0x000f55f0: PCHS=2030/16/63 translation=large LCHS=1015/32/63 s=2046240
+Space available for UMB: cc000-ef000, f0000-f55d0
+Returned 16769024 bytes of ZoneHigh
+e820 map has 5 items:
+  0: 0000000000000000 - 000000000009f000 = 1 RAM
+  1: 000000000009f000 - 00000000000a0000 = 2 RESERVED
+  2: 00000000000f0000 - 0000000000100000 = 2 RESERVED
+  3: 0000000000100000 - 0000000007bfe000 = 1 RAM
+  4: 0000000007bfe000 - 0000000008000000 = 2 RESERVED
+enter handle_19:
+  NULL
+Booting from 0000:7c00
+```
+
+![SeaBIOS](artifacts/SeaBIOS-1.jpg)
+![SeaBIOS](artifacts/SeaBIOS-2.jpg)
+
+And, of course DOOM works in DOS, though can't control anything because I haven't figured out the PS2 keyboard/mouse yet (if that header is even that) and SeaBIOS's USB keyboard emulation is not great.
+![SeaBIOS DOOM](artifacts/SeaBIOS-3.jpg)
+
+Still working on trying to get IDE DMA working, this problem is being really stubborn.<br>
+Everything looks like it's set up correctly, but any time you try to use IDE DMA transfers it just times out waiting for the interrupt to hit.<br>
+It affects SeaBIOS's IDE code, Linux, NetBSD, anything that directly uses the IDE interface.<br><br>
+And of course still working on supposed PS2 keyboard/mouse header, if that's what it is.

@@ -9,10 +9,18 @@ LD         ?= ld
 OBJCOPY    ?= objcopy
 
 # normal build files, executed in RAM with stack
-SRCS = src/elf.c src/ext2.c src/heap.c src/ide.c src/lib.c src/mbr.c src/stage2.c 
+SRCS = src/elf.c
+SRCS+= src/ext2.c
+SRCS+= src/heap.c
+SRCS+= src/ide.c
+SRCS+= src/lib.c
+SRCS+= src/linuxboot.c
+SRCS+= src/mbr.c
+SRCS+= src/seabiosboot.c
+SRCS+= src/stage2.c 
 
 # objects of normal build objects, plus the ROM resident code (init+stage1)
-OBJS = $(patsubst src/%.c, build/%.o, $(SRCS)) build/init.o
+OBJS = $(patsubst src/%.c, build/%.o, $(SRCS)) build/init.o build/seabios.o build/vgabios.o
 
 all: fgt60.rom
 
@@ -21,6 +29,12 @@ tools/romcc: tools/romcc.c
 
 build:
 	mkdir -p build
+
+build/vgabios.o: vga_1023_8500.rom
+	$(OBJCOPY) -I binary -O elf32-i386 -B i386 $< $@
+
+build/seabios.o: seabios.elf
+	$(OBJCOPY) -I binary -O elf32-i386 -B i386 $< $@
 
 # stage 1 + tail: romcc (no RAM, no stack)
 build/stage1.inc: src/stage1.c $(ROMCC) | build
