@@ -364,3 +364,10 @@ Still working on trying to get IDE DMA working, this problem is being really stu
 Everything looks like it's set up correctly, but any time you try to use IDE DMA transfers it just times out waiting for the interrupt to hit.<br>
 It affects SeaBIOS's IDE code, Linux, NetBSD, anything that directly uses the IDE interface.<br><br>
 And of course still working on supposed PS2 keyboard/mouse header, if that's what it is.
+
+## Update (11/21/2026 #2)
+So, doing some digging, apparently either the DMA isn't set up correctly at the internal CF card slot OR there's some kind of special setup this board uses... But it doesn't appear to route the actual DMA req/ack lines to the card slot.<br>
+I've connected a spinning drive to the second channel (the 40pin IDE connector) and it does UDMA no problem, as well as my SD-IDE adapter works on the second channel no problem as well.<br>
+So I'm not really sure what to do here, I'm not sure if I can disable DMA on just one channel or not, if I can I'll configure it that way. I guess it makes sense for the device, in the original setup just loading the OS image one time at power-up can be done fine at non-DMA PIO speeds.<br>
+Though I'm sure folks that ever had to power cycle these things back in the day would have appreciated the faster boot speeds.<br><br>
+A little sad with that, but I'll keep working on this a little bit when I'm bored... Otherwise this project is mostly complete, the earlier builds that boot a Linux kernel is more than enough to bring this up as an equivalent router/firewall (albiet with antiquated Linux OS) and wouldn't take much to toss together a DD-WRT rootfs with a more up to date Kernel.
